@@ -42,3 +42,5 @@ Once you entered the PostgreSQL interface, you can use your Rust code through Po
 
 As you can see on the screenshot, the call to the function returns 19456, which is the right result.
 
+## Author
+Marjorie Lapointe
