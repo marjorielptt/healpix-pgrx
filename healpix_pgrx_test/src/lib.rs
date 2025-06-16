@@ -1,8 +1,6 @@
-use pgrx::prelude::*; // par défaut
+use pgrx::prelude::*; // default
 
-// use cdshealpix::nested::get; // pour hash + center
-
-// pour best_starting_depth
+// for best_starting_depth
 static SMALLER_EDGE2OPEDGE_DIST: [f64; 30] = [
   8.410686705679302e-1,  // depth = 0
   3.7723631722170065e-1, // depth = 1
@@ -36,26 +34,31 @@ static SMALLER_EDGE2OPEDGE_DIST: [f64; 30] = [
   1.2829280665188905e-9, // depth = 29
 ];
 
-// pour nside
-// use cdshealpix::nside_unsafe;
+// for nside
 use cdshealpix::is_depth;
+
+// for nested::center
+use serde::{Serialize, Deserialize};
+
+// for nested::siblings
+//use std::range::RangeInclusive<i64>;
 
 ::pgrx::pg_module_magic!();
 
-// Fonctions HEALPix
+// HEALPix functions
 
 // -------------------------------------------------- hash --------------------------------------------------------------------------
 #[pg_extern]
 #[inline]
-/// Signature d'origine : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64 {
+/// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64 {
 pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
   cdshealpix::nested::hash(depth as u8, lon, lat) as i64
 }
 
-// -------------------------------------------------- best_starting_depth --------------------------------------------------------------------------
+// -------------------------------------------------- best_starting_depth -----------------------------------------------------------
 #[pg_extern]
 #[inline]
-/// Signature d'origine : pub fn best_starting_depth(d_max_rad: f64) -> u8 {
+/// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8 {
 pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
     cdshealpix::best_starting_depth(d_max_rad) as f64
 }
@@ -63,25 +66,49 @@ pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
 // -------------------------------------------------- nside --------------------------------------------------------------------------
 #[pg_extern]
 #[inline]
-// Signature d'origine : fn check_depth(depth : i8) {}
+// Original signature : fn check_depth(depth : i8) {}
 fn check_depth(depth: i8) {
   assert!(is_depth(depth as u8), "Expected depth in [0, 29]");
 }
 
 #[pg_extern]
 #[inline]
-// Signature d'origine : pub fn hpx_nside(depth: u8) -> u32 {
+// Original signature : pub fn hpx_nside(depth: u8) -> u32 {
 pub fn hpx_nside(depth: i8) -> f64 {
   cdshealpix::nside(depth as u8) as f64
 }
 
-// -------------------------------------------------- center --------------------------------------------------------------------------
+// -------------------------------------------------- nested::center -----------------------------------------------------------------
+// Creation of a ZocLayer type to replace Rust's tuple type because Postgres doesn't deal with tuples
+#[derive(PostgresType, Serialize, Deserialize)]
+pub struct ZocLayer {
+    pub depth: f64,
+    pub zoc: f64,
+}
+
 #[pg_extern]
 #[inline]
-// Signature d'origine : pub fn center(depth: u8, hash: u64) -> (f64, f64) {
-pub fn hpx_center(depth: i8, hash: i64) -> (f64, f64) {
-  cdshealpix::nested::center(depth as u8, hash as u64)
+// Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64) {
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub fn hpx_center(depth: i32, hash: i64) -> ZocLayer {
+  let (new_depth,new_zoc) = cdshealpix::nested::center(depth as u8, hash as u64);
+  ZocLayer{depth:new_depth, zoc:new_zoc}
 }
+
+// -------------------------------------------------- nested::parent -----------------------------------------------------------------
+#[pg_extern]
+#[inline]
+// Original signature : pub const fn parent(hash: u64, delta_depth: u8) -> u64
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
+  cdshealpix::nested::parent(hash as u64, delta_depth as u8) as i64
+}
+
+// -------------------------------------------------- nested::siblings ---------------------------------------------------------------
+// pub const fn siblings(depth: i8, hash: i64) -> RangeInclusive<i64> {
+//   cdshealpix::nested::siblings(depth as u8, hash as u64)
+// }
+
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
