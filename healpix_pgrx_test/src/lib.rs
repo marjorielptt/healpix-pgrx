@@ -6,8 +6,8 @@ use cdshealpix::nested::get;
 #[pg_extern]
 #[inline]
 // pub fn hash(depth: u8, lon: f64, lat: f64) -> u64 {
-pub fn hash(depth: f64, lon:f64, lat:f64) -> f64 {
-  get(depth as u8).hash(lon, lat) as f64
+pub fn hash(depth: f64, lon:f64, lat:f64) -> i64 {
+  get(depth as u8).hash(lon, lat) as i64
 }
 
 #[cfg(any(test, feature = "pg_test"))]
