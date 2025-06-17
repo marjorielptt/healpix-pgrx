@@ -143,7 +143,21 @@ pub fn hpx_to_zuniq(depth: i64, hash: i64) -> i64 {
   cdshealpix::nested::to_zuniq(depth as u8, hash as u64) as i64
 }
 
+// -------------------------------------------------- nested::from_uniq ----------------------------------------------------------------
+// Creation of a UniqTuple type to replace Rust's tuple type because Postgres doesn't deal with tuples
+#[derive(PostgresType, Serialize, Deserialize)]
+pub struct UniqTuple {
+    pub depth: i64,
+    pub hash_number: i64,
+}
 
+#[pg_extern]
+// Original signature : pub const fn from_uniq(uniq_hash: u64) -> (u8, u64)
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub const fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
+  let (depth, hash_number) = cdshealpix::nested::from_uniq(uniq_hash as u64);
+  UniqTuple{ depth:depth as i64, hash_number: hash_number as i64 }
+}
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
@@ -151,6 +165,7 @@ mod tests {
     use pgrx::prelude::*;
     use std::f64::consts::PI;
     use pgrx::datum::Range;
+    use cdshealpix::nested::n_hash;
 
     // Adaptation of HEALPix's Rust tests for PGRX
 
@@ -202,11 +217,6 @@ mod tests {
         assert_eq!(134217728.0, crate::hpx_nside(27));
         assert_eq!(268435456.0, crate::hpx_nside(28));
         assert_eq!(536870912.0, crate::hpx_nside(29));
-    }
-
-    #[pg_test]
-    fn test_hpx_to_uniq() {
-      assert_eq!(crate::hpx_to_uniq(0, 0) , 16);
     }
 
     #[pg_test]
@@ -274,8 +284,21 @@ mod tests {
       let children2 = crate::hpx_children(hash2, 1);
       assert_eq!(Range::lower(&children2), Some(&RangeBound::Inclusive(124i64)));
       assert_eq!(Range::upper(&children2), Some(&RangeBound::Exclusive(128i64)));
-  }
-    
+    }
+
+    #[pg_test]
+    fn test_hpx_to_uniq() {
+      // First test
+      assert_eq!(crate::hpx_to_uniq(0, 0) , 16);
+
+      // Second test
+      for depth in 0i64..8i64 {
+        for idx in 0i64..(n_hash(depth as u8) as i64) {
+          assert_eq!(depth, crate::hpx_from_uniq(crate::hpx_to_uniq(depth, idx)).depth);
+          assert_eq!(idx, crate::hpx_from_uniq(crate::hpx_to_uniq(depth,idx)).hash_number);
+        }
+      }
+    }
 }
 
 /// This module is required by `cargo pgrx test` invocations.
