@@ -41,7 +41,7 @@ use cdshealpix::is_depth;
 use serde::{Serialize, Deserialize};
 
 // for nested::siblings
-//use std::range::RangeInclusive<i64>;
+use pgrx::datum::Range;
 
 ::pgrx::pg_module_magic!();
 
@@ -97,7 +97,6 @@ pub fn hpx_center(depth: i32, hash: i64) -> ZocLayer {
 
 // -------------------------------------------------- nested::parent -----------------------------------------------------------------
 #[pg_extern]
-#[inline]
 // Original signature : pub const fn parent(hash: u64, delta_depth: u8) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
@@ -105,9 +104,45 @@ pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
 }
 
 // -------------------------------------------------- nested::siblings ---------------------------------------------------------------
-// pub const fn siblings(depth: i8, hash: i64) -> RangeInclusive<i64> {
-//   cdshealpix::nested::siblings(depth as u8, hash as u64)
-// }
+#[pg_extern]
+// Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub fn hpx_siblings(depth: i64, hash: i64) -> Range<i64> {
+  if depth == 0 {
+    Range::<i64>::new(0,11)
+  } else {
+    // floor-round to a multiple of 4
+    let hash = hash & 0xFFFFFFFFFFFFFFFCu64 as i64; // <=> & 0b1111..111100
+    Range::<i64>::new(hash,hash | 3)
+  }
+}
+
+// -------------------------------------------------- nested::children ---------------------------------------------------------------
+#[pg_extern]
+// Original signature : pub const fn children(hash: u64, delta_depth: u8) -> Range<u64>
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub fn hpx_children(hash: i64, delta_depth: i64) -> Range<i64> {
+  let twice_dd = delta_depth << 1;
+  Range::<i64>::new(hash << twice_dd,RangeBound::Exclusive((hash + 1) << twice_dd))
+}
+
+// -------------------------------------------------- nested::to_uniq ----------------------------------------------------------------
+#[pg_extern]
+#[inline]
+// Original signature : pub fn to_uniq(depth: u8, hash: u64) -> u64
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub fn hpx_to_uniq(depth: i64, hash: i64) -> i64 {
+  cdshealpix::nested::to_uniq(depth as u8, hash as u64) as i64
+}
+
+// -------------------------------------------------- nested::to_zuniq ----------------------------------------------------------------
+#[pg_extern]
+// Original signature : pub fn to_zuniq(depth: u8, hash: u64) -> u64
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub fn hpx_to_zuniq(depth: i64, hash: i64) -> i64 {
+  cdshealpix::nested::to_zuniq(depth as u8, hash as u64) as i64
+}
+
 
 
 #[cfg(any(test, feature = "pg_test"))]
@@ -115,6 +150,9 @@ pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
 mod tests {
     use pgrx::prelude::*;
     use std::f64::consts::PI;
+    use pgrx::datum::Range;
+
+    // Adaptation of HEALPix's Rust tests for PGRX
 
     #[pg_test]
     fn test_hpx_hash() {
@@ -165,6 +203,78 @@ mod tests {
         assert_eq!(268435456.0, crate::hpx_nside(28));
         assert_eq!(536870912.0, crate::hpx_nside(29));
     }
+
+    #[pg_test]
+    fn test_hpx_to_uniq() {
+      assert_eq!(crate::hpx_to_uniq(0, 0) , 16);
+    }
+
+    #[pg_test]
+    fn test_siblings() {
+
+
+        let hash1: i64 = 3;
+        let siblings1: Range<i64> = crate::hpx_siblings(0, hash1);
+
+        // Range stands for RangeInclusive here so the upper bound is inclusive
+        // Recovery of the lower and the upper bounds
+        let lower_bound1 = match Range::lower(&siblings1) {
+          Some(value) => value,
+          None => panic!("No bound"),
+        };
+        let upper_bound1 = match Range::upper(&siblings1) {
+          Some(value) => value,
+          None => panic!("No bound"),
+        };
+
+        // Extraction of the value in the &pgrx::prelude::RangeBound<i64>
+        fn extract_value(bound: &RangeBound<i64>) -> i64 {
+            match bound {
+                RangeBound::Inclusive(val) => *val,
+                RangeBound::Exclusive(val) => *val,
+                RangeBound::Infinite => panic!("Bound not supported in this test"),
+            }
+        }
+        assert!(lower_bound1.get() <= Some(&hash1) &&  upper_bound1.get() >= Some(&hash1));     // <=> siblings1.contains(&hash1)
+        assert_eq!(extract_value(lower_bound1), 0i64);
+        assert_eq!(extract_value(upper_bound1), 11i64);
+    
+
+
+        let hash2: i64 = 76;
+        let siblings2: Range<i64> = crate::hpx_siblings(2, hash2);
+
+        // Recovery of the lower and upper bounds
+        let lower_bound2 = match Range::lower(&siblings2) {
+          Some(value) => value,
+          None => panic!("No bound"),
+        };
+        let upper_bound2 = match Range::upper(&siblings2) {
+          Some(value) => value,
+          None => panic!("No bound"),
+        };
+
+        assert!(lower_bound2.get() <= Some(&hash2) && upper_bound2.get() >= Some(&hash2));     // <=> siblings2.contains(&hash2)
+        assert_eq!(extract_value(lower_bound2) & 3, 0i64);
+        assert_eq!(extract_value(upper_bound2) & 3, 3i64);
+      }
+
+    #[pg_test]
+    fn test_hpx_children() {
+      let hash1: i64 = 0;
+      let children1: Range<i64> = crate::hpx_children(hash1, 1);
+      // Range is right exclusive
+      assert_eq!(Range::lower(&children1), Some(&RangeBound::Inclusive(0i64)));
+      assert_eq!(Range::upper(&children1), Some(&RangeBound::Exclusive(4i64)));
+      let grandchildren1 = crate::hpx_children(hash1, 2);
+      assert_eq!(Range::lower(&grandchildren1), Some(&RangeBound::Inclusive(0i64)));
+      assert_eq!(Range::upper(&grandchildren1), Some(&RangeBound::Exclusive(16i64)));
+
+      let hash2: i64 = 31;
+      let children2 = crate::hpx_children(hash2, 1);
+      assert_eq!(Range::lower(&children2), Some(&RangeBound::Inclusive(124i64)));
+      assert_eq!(Range::upper(&children2), Some(&RangeBound::Exclusive(128i64)));
+  }
     
 }
 
