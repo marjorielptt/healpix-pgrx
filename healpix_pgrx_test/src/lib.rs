@@ -35,7 +35,8 @@ pub fn hpx_nside(depth: i8) -> f64 {
 }
 
 // -------------------------------------------------- nested::center -----------------------------------------------------------------
-// Creation of a ZocLayer type to replace Rust's tuple type because Postgres doesn't deal with tuples
+// Creation of a Coo type to replace Rust's tuple type because Postgres doesn't deal with tuples
+// IMPLEMENT FROM !!!
 #[derive(PostgresType, Serialize, Deserialize)]
 pub struct Coo {
     pub lon_rad: f64,
@@ -60,28 +61,29 @@ pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
 }
 
 // -------------------------------------------------- nested::siblings ---------------------------------------------------------------
-// #[pg_extern]
+#[pg_extern]
 // Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-// pub fn hpx_siblings(depth: i64, hash: i64) -> Range<i64> {
-//    if depth == 0 {
-//      Range::<i64>::new(0,11)
-//    } else {
-//      // floor-round to a multiple of 4
-//      let hash = hash & 0xFFFFFFFFFFFFFFFCu64 as i64; // <=> & 0b1111..111100
-//      Range::<i64>::new(hash,hash | 3)
-//    }
-//   let res: RangeInclusive<u64> = cdshealpix::nested::siblings(depth as u8, hash as u64);
-//   let 
-// }
+pub fn hpx_siblings(depth: i32, hash: i64) -> Range<i64> {
+  // USE TRANSMUTE !!!
+  let res = cdshealpix::nested::siblings(depth as u8, hash as u64);
+  let lower_bound = res.start();
+  let upper_bound = res.end();
+  Range::<i64>::new(*lower_bound as i64, *upper_bound as i64)
+  // let pgrx_res = unsafe { std::mem::transmute::<RangeInclusive<u64>, Range<i64>>(res) } ;
+  // pgrx_res
+}
 
 // -------------------------------------------------- nested::children ---------------------------------------------------------------
 #[pg_extern]
-// Original signature : pub const fn children(hash: u64, delta_depth: u8) -> Range<u64>
+// Original signature : pub const fn children(hash: u64, delta_depth: u8) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_children(hash: i64, delta_depth: i64) -> Range<i64> {
-  let twice_dd = delta_depth << 1;
-  Range::<i64>::new(hash << twice_dd,RangeBound::Exclusive((hash + 1) << twice_dd))
+pub fn hpx_children(hash: i64, delta_depth: i32) -> Range<i64> {
+  // USE TRANSMUTE !!!
+  let res = cdshealpix::nested::children(hash as u64, delta_depth as u8);
+  let lower_bound = res.start;
+  let upper_bound = res.end;
+  Range::<i64>::new(lower_bound as i64, upper_bound as i64)
 }
 
 // -------------------------------------------------- nested::to_uniq ----------------------------------------------------------------
@@ -89,7 +91,7 @@ pub fn hpx_children(hash: i64, delta_depth: i64) -> Range<i64> {
 #[inline]
 // Original signature : pub fn to_uniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_to_uniq(depth: i64, hash: i64) -> i64 {
+pub fn hpx_to_uniq(depth: i32, hash: i64) -> i64 {
   cdshealpix::nested::to_uniq(depth as u8, hash as u64) as i64
 }
 
@@ -97,15 +99,16 @@ pub fn hpx_to_uniq(depth: i64, hash: i64) -> i64 {
 #[pg_extern]
 // Original signature : pub fn to_zuniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_to_zuniq(depth: i64, hash: i64) -> i64 {
+pub fn hpx_to_zuniq(depth: i32, hash: i64) -> i64 {
   cdshealpix::nested::to_zuniq(depth as u8, hash as u64) as i64
 }
 
 // -------------------------------------------------- nested::from_uniq ----------------------------------------------------------------
 // Creation of a UniqTuple type to replace Rust's tuple type because Postgres doesn't deal with tuples
+// IMPLEMENT FROM !!!
 #[derive(PostgresType, Serialize, Deserialize)]
 pub struct UniqTuple {
-    pub depth: i64,
+    pub depth: i32,
     pub hash_number: i64,
 }
 
@@ -114,7 +117,7 @@ pub struct UniqTuple {
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub const fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
   let (depth, idx) = cdshealpix::nested::from_uniq(uniq_hash as u64);
-  UniqTuple{ depth:depth as i64, hash_number: idx as i64 }
+  UniqTuple{ depth:depth as i32, hash_number: idx as i64 }
 }
 
 // -------------------------------------------------- nested::from_zuniq ---------------------------------------------------------------
@@ -123,7 +126,7 @@ pub const fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub const fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
   let (depth, idx) = cdshealpix::nested::from_zuniq(zuniq as u64);
-  UniqTuple{ depth: depth as i64, hash_number: idx as i64}
+  UniqTuple{ depth: depth as i32, hash_number: idx as i64}
 }
 
 // -------------------------------------------------- nested::external_edge -------------------------------------------------------------
