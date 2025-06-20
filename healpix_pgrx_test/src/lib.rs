@@ -43,6 +43,9 @@ use serde::{Serialize, Deserialize};
 // for nested::siblings
 use pgrx::datum::Range;
 
+// for nested::external_edge
+use pgrx::pg_sys::ArrayType;
+
 ::pgrx::pg_module_magic!();
 
 // HEALPix functions
@@ -81,18 +84,18 @@ pub fn hpx_nside(depth: i8) -> f64 {
 // -------------------------------------------------- nested::center -----------------------------------------------------------------
 // Creation of a ZocLayer type to replace Rust's tuple type because Postgres doesn't deal with tuples
 #[derive(PostgresType, Serialize, Deserialize)]
-pub struct ZocLayer {
-    pub depth: f64,
-    pub zoc: f64,
+pub struct Coo {
+    pub lon_rad: f64,
+    pub lat_rad: f64,
 }
 
 #[pg_extern]
 #[inline]
 // Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64) {
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_center(depth: i32, hash: i64) -> ZocLayer {
-  let (new_depth,new_zoc) = cdshealpix::nested::center(depth as u8, hash as u64);
-  ZocLayer{depth:new_depth, zoc:new_zoc}
+pub fn hpx_center(depth: i32, hash: i64) -> Coo {
+  let (new_lon,new_lat) = cdshealpix::nested::center(depth as u8, hash as u64);
+  Coo{lon_rad:new_lon, lat_rad:new_lat}
 }
 
 // -------------------------------------------------- nested::parent -----------------------------------------------------------------
@@ -155,10 +158,62 @@ pub struct UniqTuple {
 // Original signature : pub const fn from_uniq(uniq_hash: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub const fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
-  let (depth, hash_number) = cdshealpix::nested::from_uniq(uniq_hash as u64);
-  UniqTuple{ depth:depth as i64, hash_number: hash_number as i64 }
+  let (depth, idx) = cdshealpix::nested::from_uniq(uniq_hash as u64);
+  UniqTuple{ depth:depth as i64, hash_number: idx as i64 }
 }
 
+// -------------------------------------------------- nested::from_zuniq ---------------------------------------------------------------
+#[pg_extern]
+// Original signature : pub const fn from_zuniq(zuniq: u64) -> (u8, u64) {
+// Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
+pub const fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
+  let (depth, idx) = cdshealpix::nested::from_zuniq(zuniq as u64);
+  UniqTuple{ depth: depth as i64, hash_number: idx as i64}
+}
+
+// -------------------------------------------------- nested::external_edge -------------------------------------------------------------
+
+// nested::external_edge doesn't compile yet and I'm still working on it.
+// Here are some versions that I tried but none of them work.
+
+// VERSION 1
+
+// Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
+#[pg_extern]
+pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<[i64]> {
+  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
+  let vec_i64: Vec<[i64]> = box_u64.into_vec().iter().map(|x| x as i64).collect();
+  vec_i64.into_pg_boxed()
+}
+
+// VERSION 2 : inspired by a similar code on GitHub
+
+#[pg_extern]
+pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<pg_sys::ArrayType, AllocatedByRust> {
+  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
+  let array_header =
+          unsafe { pg_sys::pg_detoast_datum_packed(box_u64.cast_mut_ptr()) } as pg_sys::ArrayType;
+  let mut array = unsafe { PgBox::<pg_sys::ArrayType>::alloc0() };
+
+  array.vl_len_ = array_header.len() as i32;
+  array.ndim  = 12i32;
+  array.dataoffset  = 12i32;
+  array.elemtype = i64;
+  array
+}
+
+// VERSION 3 : inspired by PGRX's documentation
+
+#[pg_extern]
+pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<pg_sys::ArrayType, AllocatedByRust> {
+  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
+  let mut box_i64: PgBox<[i64], AllocatedByRust> = unsafe { PgBox::<[i64]>::alloc() };
+  // ptr is uninitialized data!!! This is dangerous to read from!!!
+  assert_eq!(*box_i64, *array_i64);
+  box_i64
+}
+
+// -------------------------------------------------------- TESTS ------------------------------------------------------------------------
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
@@ -220,9 +275,22 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_siblings() {
+    fn test_hpx_parent() {
+        let hash1: i64 = 4;
+        let parent1 = crate::hpx_parent(hash1, 1);
+        assert_eq!(parent1, 1);
+    
+        let hash2: i64 = 640;
+        let parent2 = crate::hpx_parent(hash2, 1);
+        assert_eq!(parent2, 160);
+        let grandparent2 = crate::hpx_parent(hash2, 2);
+        assert_eq!(grandparent2, 40);
+        let base2 = crate::hpx_parent(hash2, 3);
+        assert_eq!(base2, 10);
+      }
 
-
+    #[pg_test]
+    fn test_hpx_siblings() {
         let hash1: i64 = 3;
         let siblings1: Range<i64> = crate::hpx_siblings(0, hash1);
 
