@@ -1,50 +1,10 @@
 use pgrx::prelude::*; // default
 
-// for best_starting_depth
-static SMALLER_EDGE2OPEDGE_DIST: [f64; 30] = [
-  8.410686705679302e-1,  // depth = 0
-  3.7723631722170065e-1, // depth = 1
-  1.8203364957037313e-1, // depth = 2
-  8.91145416330163e-2,   // depth = 3
-  4.3989734509169175e-2, // depth = 4
-  2.1817362566054977e-2, // depth = 5
-  1.0854009694242892e-2, // depth = 6
-  5.409888140793663e-3,  // depth = 7
-  2.6995833266547898e-3, // depth = 8
-  1.3481074874673246e-3, // depth = 9
-  6.735240905806414e-4,  // depth = 10
-  3.365953703015157e-4,  // depth = 11
-  1.682452196838741e-4,  // depth = 12
-  8.410609042173736e-5,  // depth = 13
-  4.204784317861652e-5,  // depth = 14
-  2.1022283297961136e-5, // depth = 15
-  1.0510625670060442e-5, // depth = 16
-  5.255150320257332e-6,  // depth = 17
-  2.6275239729465538e-6, // depth = 18
-  1.3137458638808036e-6, // depth = 19
-  6.568678535571394e-7,  // depth = 20
-  3.284323270983175e-7,  // depth = 21
-  1.642156595517884e-7,  // depth = 22
-  8.21076709163242e-8,   // depth = 23
-  4.105378528139296e-8,  // depth = 24
-  2.0526876713226626e-8, // depth = 25
-  1.0263433216329513e-8, // depth = 26
-  5.131714858175969e-9,  // depth = 27
-  2.5658567623093986e-9, // depth = 28
-  1.2829280665188905e-9, // depth = 29
-];
-
-// for nside
-use cdshealpix::is_depth;
-
 // for nested::center
 use serde::{Serialize, Deserialize};
 
 // for nested::siblings
 use pgrx::datum::Range;
-
-// for nested::external_edge
-use pgrx::pg_sys::ArrayType;
 
 ::pgrx::pg_module_magic!();
 
@@ -67,13 +27,6 @@ pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
 }
 
 // -------------------------------------------------- nside --------------------------------------------------------------------------
-#[pg_extern]
-#[inline]
-// Original signature : fn check_depth(depth : i8) {}
-fn check_depth(depth: i8) {
-  assert!(is_depth(depth as u8), "Expected depth in [0, 29]");
-}
-
 #[pg_extern]
 #[inline]
 // Original signature : pub fn hpx_nside(depth: u8) -> u32 {
@@ -107,18 +60,20 @@ pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
 }
 
 // -------------------------------------------------- nested::siblings ---------------------------------------------------------------
-#[pg_extern]
+// #[pg_extern]
 // Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_siblings(depth: i64, hash: i64) -> Range<i64> {
-  if depth == 0 {
-    Range::<i64>::new(0,11)
-  } else {
-    // floor-round to a multiple of 4
-    let hash = hash & 0xFFFFFFFFFFFFFFFCu64 as i64; // <=> & 0b1111..111100
-    Range::<i64>::new(hash,hash | 3)
-  }
-}
+// pub fn hpx_siblings(depth: i64, hash: i64) -> Range<i64> {
+//    if depth == 0 {
+//      Range::<i64>::new(0,11)
+//    } else {
+//      // floor-round to a multiple of 4
+//      let hash = hash & 0xFFFFFFFFFFFFFFFCu64 as i64; // <=> & 0b1111..111100
+//      Range::<i64>::new(hash,hash | 3)
+//    }
+//   let res: RangeInclusive<u64> = cdshealpix::nested::siblings(depth as u8, hash as u64);
+//   let 
+// }
 
 // -------------------------------------------------- nested::children ---------------------------------------------------------------
 #[pg_extern]
@@ -172,46 +127,25 @@ pub const fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
 }
 
 // -------------------------------------------------- nested::external_edge -------------------------------------------------------------
-
-// nested::external_edge doesn't compile yet and I'm still working on it.
-// Here are some versions that I tried but none of them work.
-
-// VERSION 1
-
+#[pg_extern]
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
-#[pg_extern]
-pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<[i64]> {
-  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
-  let vec_i64: Vec<[i64]> = box_u64.into_vec().iter().map(|x| x as i64).collect();
-  vec_i64.into_pg_boxed()
+pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
+  let vec_u64: Vec<u64> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
+  let vec_i64 = unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) } ;
+  vec_i64
 }
 
-// VERSION 2 : inspired by a similar code on GitHub
-
+// -------------------------------------------------- nested::internal_edge --------------------------------------------------------------
 #[pg_extern]
-pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<pg_sys::ArrayType, AllocatedByRust> {
-  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
-  let array_header =
-          unsafe { pg_sys::pg_detoast_datum_packed(box_u64.cast_mut_ptr()) } as pg_sys::ArrayType;
-  let mut array = unsafe { PgBox::<pg_sys::ArrayType>::alloc0() };
-
-  array.vl_len_ = array_header.len() as i32;
-  array.ndim  = 12i32;
-  array.dataoffset  = 12i32;
-  array.elemtype = i64;
-  array
+// Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
+pub fn hpx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
+  let vec_u64: Vec<u64> = cdshealpix::nested::internal_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
+  let vec_i64 = unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) } ;
+  vec_i64
 }
 
-// VERSION 3 : inspired by PGRX's documentation
+// -------------------------------------------------- nested::neighbours -----------------------------------------------------------------
 
-#[pg_extern]
-pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> PgBox<pg_sys::ArrayType, AllocatedByRust> {
-  let box_u64: Box<[u64]> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8);
-  let mut box_i64: PgBox<[i64], AllocatedByRust> = unsafe { PgBox::<[i64]>::alloc() };
-  // ptr is uninitialized data!!! This is dangerous to read from!!!
-  assert_eq!(*box_i64, *array_i64);
-  box_i64
-}
 
 // -------------------------------------------------------- TESTS ------------------------------------------------------------------------
 #[cfg(any(test, feature = "pg_test"))]
