@@ -98,7 +98,7 @@ impl From<RangeCurrentCrate> for pgrx::datum::Range<i64> {
   fn from(item: RangeCurrentCrate) -> pgrx::datum::Range<i64> {
     let lower_bound = item.0.start;
     let upper_bound = item.0.end;
-    pgrx::datum::Range::<i64>::new(lower_bound as i64, upper_bound as i64)
+    pgrx::datum::Range::<i64>::new(lower_bound as i64, RangeBound::Exclusive(upper_bound as i64))
   }
 }
 
@@ -174,7 +174,29 @@ pub fn hpx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
 }
 
 // -------------------------------------------------- nested::neighbours -----------------------------------------------------------------
+#[derive(PostgresType, Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct MainWindMapPSQL {
+  array: [Option<i64>; 9],
+}
 
+impl From<cdshealpix::compass_point::MainWindMap<u64>> for MainWindMapPSQL {
+  fn from(item: cdshealpix::compass_point::MainWindMap<u64>) -> Self {
+    let entries_vec = item.entries_vec();
+    let mut array: [Option<i64>; 9] = [None; 9];
+    for i in 0..10 {
+      let (_, val) = &entries_vec[i];
+      array[i] = Some(*val as i64);
+    }
+    MainWindMapPSQL { array }
+  }
+}
+
+#[pg_extern]
+#[inline]
+// Original signature : pub fn neighbours(depth: u8, hash: u64, include_center: bool) -> MainWindMap<u64>
+pub fn hpx_neighbours(depth: i32, hash: i64, include_center: bool) -> MainWindMapPSQL {
+  cdshealpix::nested::neighbours(depth as u8, hash as u64, include_center).into()
+}
 
 // -------------------------------------------------------- TESTS ------------------------------------------------------------------------
 #[cfg(any(test, feature = "pg_test"))]
@@ -323,10 +345,10 @@ mod tests {
       assert_eq!(crate::hpx_to_uniq(0, 0) , 16);
 
       // Second test
-      for depth in 0i64..8i64 {
+      for depth in 0i32..8i32 {
         for idx in 0i64..(n_hash(depth as u8) as i64) {
           assert_eq!(depth, crate::hpx_from_uniq(crate::hpx_to_uniq(depth, idx)).depth);
-          assert_eq!(idx, crate::hpx_from_uniq(crate::hpx_to_uniq(depth,idx)).hash_number);
+          assert_eq!(idx, crate::hpx_from_uniq(crate::hpx_to_uniq(depth,idx)).hash);
         }
       }
     }
