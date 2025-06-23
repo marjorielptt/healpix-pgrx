@@ -37,6 +37,7 @@ The [function](https://github.com/cds-astro/cds-healpix-rust/blob/ac8a3d2dd5d0e3
 
   Once you entered the PostgreSQL interface, you can use your Rust code through PostgreSQL queries.
 
+  + `healpix_pgrx_test=# DROP EXTENSION healpix_pgrx_test;` : **if you already created an extension called `healpix_pgrx_test`**, you have to manually drop and recreate it for Postgres to consider the latest updates of your code
   + `healpix_pgrx_test=# CREATE EXTENSION healpix_pgrx_test;` : creates the extension corresponding to my repository
   + `healpix_pgrx_test=# SELECT hash(<arg1>, <arg2>, <arg3>);` : calls the Rust function from HEALPix
 
