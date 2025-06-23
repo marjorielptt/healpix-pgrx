@@ -12,7 +12,7 @@ use std::ops::RangeInclusive;
 // HEALPix functions
 
 // -------------------------------------------------- hash --------------------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64
 pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
@@ -20,7 +20,7 @@ pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
 }
 
 // -------------------------------------------------- best_starting_depth -----------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8
 pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
@@ -28,7 +28,7 @@ pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
 }
 
 // -------------------------------------------------- nside --------------------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn hpx_nside(depth: u8) -> u32
 pub fn hpx_nside(depth: i8) -> f64 {
@@ -49,7 +49,7 @@ impl From<(f64, f64)> for Coo {
   }
 }
 
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
@@ -58,7 +58,7 @@ pub fn hpx_center(depth: i32, hash: i64) -> Coo {
 }
 
 // -------------------------------------------------- nested::parent -----------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn parent(hash: u64, delta_depth: u8) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
@@ -80,7 +80,7 @@ impl From<RangeInclusiveCurrentCrate> for Range<i64> {
   }
 }
 
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_siblings(depth: i32, hash: i64) -> Range<i64> {
@@ -102,7 +102,7 @@ impl From<RangeCurrentCrate> for pgrx::datum::Range<i64> {
   }
 }
 
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn children(hash: u64, delta_depth: u8) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
@@ -110,7 +110,7 @@ pub fn hpx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
 }
 
 // -------------------------------------------------- nested::to_uniq ----------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn to_uniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
@@ -119,7 +119,7 @@ pub fn hpx_to_uniq(depth: i32, hash: i64) -> i64 {
 }
 
 // -------------------------------------------------- nested::to_zuniq ----------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn to_zuniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_to_zuniq(depth: i32, hash: i64) -> i64 {
@@ -140,7 +140,7 @@ impl From<(u8, u64)> for UniqTuple {
   }
 }
 
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn from_uniq(uniq_hash: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
@@ -148,7 +148,7 @@ pub fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
 }
 
 // -------------------------------------------------- nested::from_zuniq ---------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn from_zuniq(zuniq: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
@@ -156,7 +156,7 @@ pub fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
 }
 
 // -------------------------------------------------- nested::external_edge -------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
 pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
@@ -165,7 +165,7 @@ pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
 }
 
 // -------------------------------------------------- nested::internal_edge --------------------------------------------------------------
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
 pub fn hpx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::internal_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
@@ -191,7 +191,7 @@ impl From<cdshealpix::compass_point::MainWindMap<u64>> for MainWindMapPSQL {
   }
 }
 
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn neighbours(depth: u8, hash: u64, include_center: bool) -> MainWindMap<u64>
 pub fn hpx_neighbours(depth: i32, hash: i64, include_center: bool) -> MainWindMapPSQL {
