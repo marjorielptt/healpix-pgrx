@@ -1,10 +1,11 @@
 use pgrx::prelude::*; // default
 
-// for nested::center
+// for nested::center + nested::from_uniq + nested::from_zuniq
 use serde::{Serialize, Deserialize};
 
-// for nested::siblings
+// for nested::siblings + nested::children
 use pgrx::datum::Range;
+use std::ops::RangeInclusive;
 
 ::pgrx::pg_module_magic!();
 
@@ -13,7 +14,7 @@ use pgrx::datum::Range;
 // -------------------------------------------------- hash --------------------------------------------------------------------------
 #[pg_extern]
 #[inline]
-/// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64 {
+/// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64
 pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
   cdshealpix::nested::hash(depth as u8, lon, lat) as i64
 }
@@ -21,7 +22,7 @@ pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
 // -------------------------------------------------- best_starting_depth -----------------------------------------------------------
 #[pg_extern]
 #[inline]
-/// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8 {
+/// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8
 pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
     cdshealpix::best_starting_depth(d_max_rad) as f64
 }
@@ -29,27 +30,31 @@ pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
 // -------------------------------------------------- nside --------------------------------------------------------------------------
 #[pg_extern]
 #[inline]
-// Original signature : pub fn hpx_nside(depth: u8) -> u32 {
+// Original signature : pub fn hpx_nside(depth: u8) -> u32
 pub fn hpx_nside(depth: i8) -> f64 {
   cdshealpix::nside(depth as u8) as f64
 }
 
 // -------------------------------------------------- nested::center -----------------------------------------------------------------
 // Creation of a Coo type to replace Rust's tuple type because Postgres doesn't deal with tuples
-// IMPLEMENT FROM !!!
 #[derive(PostgresType, Serialize, Deserialize)]
 pub struct Coo {
     pub lon_rad: f64,
     pub lat_rad: f64,
 }
 
+impl From<(f64, f64)> for Coo {
+  fn from(item: (f64, f64)) -> Coo {
+    Coo {lon_rad:item.0, lat_rad:item.1}
+  }
+}
+
 #[pg_extern]
 #[inline]
-// Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64) {
+// Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_center(depth: i32, hash: i64) -> Coo {
-  let (new_lon,new_lat) = cdshealpix::nested::center(depth as u8, hash as u64);
-  Coo{lon_rad:new_lon, lat_rad:new_lat}
+  cdshealpix::nested::center(depth as u8, hash as u64).into()
 }
 
 // -------------------------------------------------- nested::parent -----------------------------------------------------------------
@@ -61,29 +66,47 @@ pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
 }
 
 // -------------------------------------------------- nested::siblings ---------------------------------------------------------------
+// std::ops::RangeInclusive<u64> and pgrx::datum::Range<i64> are both foreign traits so the From implementation doesn't work
+
+// Solution : Creation of a RangeInclusiveCurrentCrate struct in the current crate to be able to implement From with
+// the known type RangeInclusiveCurrentCrate and the foreign trait Range
+pub struct RangeInclusiveCurrentCrate(pub RangeInclusive<u64>);
+
+impl From<RangeInclusiveCurrentCrate> for Range<i64> {
+  fn from(item: RangeInclusiveCurrentCrate) -> Range<i64> {
+    let lower_bound = item.0.start();
+    let upper_bound = item.0.end();
+    Range::<i64>::new(*lower_bound as i64, *upper_bound as i64)
+  }
+}
+
 #[pg_extern]
 // Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
 pub fn hpx_siblings(depth: i32, hash: i64) -> Range<i64> {
-  // USE TRANSMUTE !!!
-  let res = cdshealpix::nested::siblings(depth as u8, hash as u64);
-  let lower_bound = res.start();
-  let upper_bound = res.end();
-  Range::<i64>::new(*lower_bound as i64, *upper_bound as i64)
-  // let pgrx_res = unsafe { std::mem::transmute::<RangeInclusive<u64>, Range<i64>>(res) } ;
-  // pgrx_res
+  RangeInclusiveCurrentCrate(cdshealpix::nested::siblings(depth as u8, hash as u64)).into()
 }
 
 // -------------------------------------------------- nested::children ---------------------------------------------------------------
+// std::ops::Range<u64> and pgrx::datum::Range<i64> are both foreign traits so the From implementation doesn't work
+
+// Solution : Creation of a RangeCurrentCrate struct in the current crate to be able to implement From with
+// the known type RangeCurrentCrate and the foreign trait pgrx::datum::Range
+pub struct RangeCurrentCrate(pub std::ops::Range<u64>);
+
+impl From<RangeCurrentCrate> for pgrx::datum::Range<i64> {
+  fn from(item: RangeCurrentCrate) -> pgrx::datum::Range<i64> {
+    let lower_bound = item.0.start;
+    let upper_bound = item.0.end;
+    pgrx::datum::Range::<i64>::new(lower_bound as i64, upper_bound as i64)
+  }
+}
+
 #[pg_extern]
 // Original signature : pub const fn children(hash: u64, delta_depth: u8) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_children(hash: i64, delta_depth: i32) -> Range<i64> {
-  // USE TRANSMUTE !!!
-  let res = cdshealpix::nested::children(hash as u64, delta_depth as u8);
-  let lower_bound = res.start;
-  let upper_bound = res.end;
-  Range::<i64>::new(lower_bound as i64, upper_bound as i64)
+pub fn hpx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
+  RangeCurrentCrate(cdshealpix::nested::children(hash as u64, delta_depth as u8)).into()
 }
 
 // -------------------------------------------------- nested::to_uniq ----------------------------------------------------------------
@@ -105,28 +128,31 @@ pub fn hpx_to_zuniq(depth: i32, hash: i64) -> i64 {
 
 // -------------------------------------------------- nested::from_uniq ----------------------------------------------------------------
 // Creation of a UniqTuple type to replace Rust's tuple type because Postgres doesn't deal with tuples
-// IMPLEMENT FROM !!!
 #[derive(PostgresType, Serialize, Deserialize)]
 pub struct UniqTuple {
     pub depth: i32,
-    pub hash_number: i64,
+    pub hash: i64,
+}
+
+impl From<(u8, u64)> for UniqTuple {
+  fn from(item: (u8, u64)) -> UniqTuple {
+    UniqTuple {depth:item.0 as i32, hash:item.1 as i64}
+  }
 }
 
 #[pg_extern]
 // Original signature : pub const fn from_uniq(uniq_hash: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub const fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
-  let (depth, idx) = cdshealpix::nested::from_uniq(uniq_hash as u64);
-  UniqTuple{ depth:depth as i32, hash_number: idx as i64 }
+pub fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
+  cdshealpix::nested::from_uniq(uniq_hash as u64).into()
 }
 
 // -------------------------------------------------- nested::from_zuniq ---------------------------------------------------------------
 #[pg_extern]
-// Original signature : pub const fn from_zuniq(zuniq: u64) -> (u8, u64) {
+// Original signature : pub const fn from_zuniq(zuniq: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub const fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
-  let (depth, idx) = cdshealpix::nested::from_zuniq(zuniq as u64);
-  UniqTuple{ depth: depth as i32, hash_number: idx as i64}
+pub fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
+  cdshealpix::nested::from_zuniq(zuniq as u64).into()
 }
 
 // -------------------------------------------------- nested::external_edge -------------------------------------------------------------
