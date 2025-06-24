@@ -1,6 +1,8 @@
 use pgrx::prelude::*; // default
 
 mod bmoc;
+
+#[cfg(test)]
 mod tests;
 
 // for nested::center + nested::from_uniq + nested::from_zuniq
