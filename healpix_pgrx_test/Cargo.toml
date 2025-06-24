@@ -1,7 +1,12 @@
 [package]
 name = "healpix_pgrx_test"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
+authors = ["Marjorie Lapointe <marjorie.lapointe@zaclys.net>"]
+description = "A Postgres extension for HEALPix in Rust"
+homepage = "https://github.com/marjorielptt/healpix-pgrx-test"
+repository = "https://github.com/marjorielptt/healpix-pgrx-test"
+keywords = ["Postgres", "extension", "HEALPix"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
