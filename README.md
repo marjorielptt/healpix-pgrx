@@ -1,4 +1,4 @@
-# PostgreSQL extension for HEALPix
+# PostgreSQL extension for HEALPix in Rust
 
 This repository is based on the use of [PGRX](https://github.com/pgcentralfoundation/pgrx/tree/develop), a framework created to develop PostgreSQL extensions in Rust .   
 
