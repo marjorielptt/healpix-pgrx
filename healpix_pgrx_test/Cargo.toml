@@ -7,6 +7,7 @@ description = "A Postgres extension for HEALPix in Rust"
 homepage = "https://github.com/marjorielptt/healpix-pgrx-test"
 repository = "https://github.com/marjorielptt/healpix-pgrx-test"
 keywords = ["Postgres", "extension", "HEALPix"]
+readme = "README.md"
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -26,7 +27,7 @@ pg_test = []
 
 [dependencies]
 pgrx = "=0.14.3"
-cdshealpix = { path = "/home/mlapointe/Documents/Code/HEALPix/cds-healpix-rust-master" }
+cdshealpix = { version = "0.8.0", path = "/home/mlapointe/Documents/Code/HEALPix/cds-healpix-rust-master" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
