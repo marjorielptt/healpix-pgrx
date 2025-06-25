@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 use cdshealpix::nested::bmoc::BMOC;
 
 // For contains implementations
+use cdshealpix::nested::bmoc::Status;
 // use cdshealpix::sph_geom::coo3d::{UnitVec3, Vec3};
 // 
 // extern crate cdshealpix;
@@ -48,6 +49,10 @@ impl From<BMOC> for BMOCpsql {
 // pub fn hpx_ellipse_contains(ellipse_obj: ellipse::Ellipse, x:f64, y:f64) -> bool {
 //     ellipse.cdshealpix::xy_geom::contains(x,y)
 // }
+
+pub fn hpx_contains(bmoc: BMOC, lon: f64, lat:f64) -> Status {
+    bmoc.test_coo(lon, lat)
+}
 
 // ------------------------------------------- Operations -----------------------------------------
 
