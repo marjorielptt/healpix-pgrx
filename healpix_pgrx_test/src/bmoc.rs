@@ -2,9 +2,10 @@ use pgrx::prelude::*; // default
 
 use serde::{Serialize, Deserialize};
 
-// For not
-// use cdshealpix::nested::bmoc::BMOC;
+// For the operations with the BMOCs
+use cdshealpix::nested::bmoc::BMOC;
 
+// For contains implementations
 // use cdshealpix::sph_geom::coo3d::{UnitVec3, Vec3};
 // 
 // extern crate cdshealpix;
@@ -18,13 +19,13 @@ pub struct BMOCpsql {
     pub entries: Vec<i64>,
 }
 
-// impl From<BMOC> for BMOCpsql {
-//   fn from(item: BMOC) -> BMOCpsql {
-//     let entries_vec_u64 = item.entries.into_vec();
-//     let entries_vec_i64 = unsafe {std::mem::transmute::<Vec<u64>, Vec<i64>>(entries_vec_u64)};
-//     BMOCpsql {depth_max:item.depth_max as i32, entries: entries_vec_i64}
-//   }
-// }
+impl From<BMOC> for BMOCpsql {
+  fn from(item: BMOC) -> BMOCpsql {
+    let entries_vec_u64 = item.entries.clone().into_vec();
+    let entries_vec_i64 = unsafe {std::mem::transmute::<Vec<u64>, Vec<i64>>(entries_vec_u64)};
+    BMOCpsql {depth_max:item.get_depth_max() as i32, entries: entries_vec_i64}
+  }
+}
 
 // ------------------------------------------- Contains -------------------------------------------
 
@@ -51,22 +52,22 @@ pub struct BMOCpsql {
 // ------------------------------------------- Operations -----------------------------------------
 
 // Not
-// pub fn hpx_not(bmoc: BMOC) -> BMOCpsql {
-//     bmoc.cdshealpix::nested::not().into()
-// }
-// 
-// // And
-// pub fn hpx_and(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
-//     bmoc.cdshealpix::nested::and(&other).into()
-// }
-// 
-// // Or
-// pub fn hpx_or(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
-//     bmoc.cdshealpix::nested::or(&other).into()
-// }
-// 
-// // Xor
-// pub fn hpx_xor(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
-//     bmoc.cdshealpix::nested::xor(&other).into()
-// }
+pub fn hpx_not(bmoc: BMOC) -> BMOCpsql {
+    bmoc.not().into()
+}
+
+// And
+pub fn hpx_and(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
+    bmoc.and(&other).into()
+}
+
+// Or
+pub fn hpx_or(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
+    bmoc.or(&other).into()
+}
+
+// Xor
+pub fn hpx_xor(bmoc: BMOC, other: &BMOC) -> BMOCpsql {
+    bmoc.xor(&other).into()
+}
 
