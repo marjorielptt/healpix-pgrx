@@ -38,11 +38,14 @@ impl From<BMOCpsql> for BMOC {
     };
     
     let mut builder = BMOCBuilderFixedDepth::new(item.depth_max as u8, true);
-        for h in entries_vec_u64 {
-            builder.push(h);              
+        for vec in entries_vec_u64 {
+            builder.push(vec);              
         }
 
-    builder.to_bmoc().expect("BMOCpsql invalide")
+    match builder.to_bmoc() {
+        Some(res) => res,
+        None => panic!("Empty bmoc, you have to re-init it before re-using it!"),
+    }
 }
 }
 
