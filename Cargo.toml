@@ -1,5 +1,5 @@
 [package]
-name = "healpix_pgrx_test"
+name = "healpix_pgrx"
 version = "0.0.1"
 edition = "2021"
 authors = ["Marjorie Lapointe <marjorie.lapointe@zaclys.net>"]
@@ -13,7 +13,7 @@ readme = "README.md"
 crate-type = ["cdylib", "lib"]
 
 [[bin]]
-name = "pgrx_embed_healpix_pgrx_test"
+name = "pgrx_embed_healpix_pgrx"
 path = "./src/bin/pgrx_embed.rs"
 
 [features]
