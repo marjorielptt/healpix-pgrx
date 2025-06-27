@@ -18,8 +18,8 @@ mod tests;
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64
-pub fn hpx_hash(depth: f64, lon:f64, lat:f64) -> i64 {
-  cdshealpix::nested::hash(depth as u8, lon, lat) as i64
+pub fn hpx_hash(depth: i32, lon:f64, lat:f64) -> i64 {
+  cdshealpix::nested::hash(depth as u8, lon.to_radians(), lat.to_radians()) as i64
 }
 
 // -------------------------------------------------- best_starting_depth -----------------------------------------------------------
@@ -184,11 +184,9 @@ pub struct MainWindMapPSQL {
 
 impl From<cdshealpix::compass_point::MainWindMap<u64>> for MainWindMapPSQL {
   fn from(item: cdshealpix::compass_point::MainWindMap<u64>) -> Self {
-    let entries_vec = item.entries_vec();
     let mut array: [Option<i64>; 9] = [None; 9];
-    for i in 0..10 {
-      let (_, val) = &entries_vec[i];
-      array[i] = Some(*val as i64);
+    for (mw, val) in item.entries_vec() {
+      array[mw as usize] = Some(val as i64);
     }
     MainWindMapPSQL { array }
   }
