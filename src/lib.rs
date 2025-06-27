@@ -1,10 +1,5 @@
 use pgrx::prelude::*; // default
 
-mod bmoc;
-
-#[cfg(test)]
-mod tests;
-
 // for nested::center + nested::from_uniq + nested::from_zuniq
 use serde::{Serialize, Deserialize};
 
@@ -13,6 +8,9 @@ use pgrx::datum::Range;
 use std::ops::RangeInclusive;
 
 ::pgrx::pg_module_magic!();
+
+mod bmoc;
+mod tests;
 
 // HEALPix functions
 

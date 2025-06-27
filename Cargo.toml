@@ -1,5 +1,5 @@
 [package]
-name = "healpix_pgrx"
+name = "healpix_pgrx_test"
 version = "0.0.1"
 edition = "2021"
 authors = ["Marjorie Lapointe <marjorie.lapointe@zaclys.net>"]
@@ -13,7 +13,7 @@ readme = "README.md"
 crate-type = ["cdylib", "lib"]
 
 [[bin]]
-name = "pgrx_embed_healpix_pgrx"
+name = "pgrx_embed_healpix_pgrx_test"
 path = "./src/bin/pgrx_embed.rs"
 
 [features]
@@ -27,7 +27,7 @@ pg_test = []
 
 [dependencies]
 pgrx = "=0.14.3"
-cdshealpix = { version = "0.8.0", path = "/home/mlapointe/Documents/Code/HEALPix/cds-healpix-rust-master" }
+cdshealpix = { git = "https://github.com/cds-astro/cds-healpix-rust.git" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
