@@ -58,15 +58,26 @@ pub fn hpx_zone_coverage(depth: i32, lon_min: f64, lat_min: f64, lon_max: f64, l
   cdshealpix::nested::zone_coverage(depth as u8, lon_min, lat_min, lon_max, lat_max).into()
 }
 
-// #[derive(PostgresType, Serialize, Deserialize)]
-// pub struct Vertexpsql(f64, f64);
+// Type created to adapt the Rust vertex tuple (f64, f64) to PSQL for polygon_coverage
+#[derive(PostgresType, Serialize, Deserialize)]
+pub struct Vertexpsql(f64, f64);
 
-// // Polygon
-// #[pg_extern(immutable, parallel_safe)]
-// pub fn hpx_polygon_coverage(depth: i32, vertices: Vec<Vertexpsql>, exact_solution: bool) -> BMOCpsql {
-//   let Some(vertices_as_array) = vertices.as_array();
-//   cdshealpix::nested::polygon_coverage(depth as u8, &vertices_as_array, exact_solution).into()
-// }
+impl From<Vertexpsql> for (f64,f64) {
+  fn from(item: Vertexpsql) -> Self {
+    (item.0, item.1)
+  }
+}
+
+// Polygon
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_polygon_coverage(depth: i32, vertices: Vec<Vertexpsql>, exact_solution: bool) -> BMOCpsql {
+  let mut vertices_tuple: Vec<(f64,f64)> = Vec::new();
+  for vertex in vertices {
+    vertices_tuple.push(vertex.into());
+  }
+  let vertices_as_array = vertices_tuple.as_slice();
+  cdshealpix::nested::polygon_coverage(depth as u8, vertices_as_array, exact_solution).into()
+}
 
 // Box
 #[pg_extern(immutable, parallel_safe)]
