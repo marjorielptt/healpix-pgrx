@@ -1,0 +1,6 @@
+comment = 'healpix_pgrx:  Created by pgrx'
+default_version = '@CARGO_VERSION@'
+module_pathname = 'healpix_pgrx'
+relocatable = false
+superuser = true
+trusted = false
