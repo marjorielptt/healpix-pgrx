@@ -9,12 +9,13 @@ mod tests {
     use std::f64::consts::PI;
     use pgrx::datum::Range;
     use cdshealpix::nested::n_hash;
+    use crate::bmoc::BMOCpsql;
 
     // Adaptation of HEALPix's Rust tests for PGRX
 
     #[pg_test]
     fn test_hpx_hash() {
-        assert_eq!(19456, crate::hpx_hash(6.0,0.0,0.0));
+        assert_eq!(19456, crate::hpx_hash(6,0.0,0.0));
     }
 
     #[pg_test]
@@ -155,4 +156,69 @@ mod tests {
         }
       }
     }
-}
+
+    #[pg_test]
+    // Bad test : no cell treatment before the operation
+    // See the full test on https://github.com/cds-astro/cds-healpix-rust/tree/48a5ee396abf852450e4b685f6e107310f39beec
+    fn test_hpx_and() {
+      let mut vec_test_1: Vec<i64> = Vec::new();
+      vec_test_1.push(1099);
+      vec_test_1.push(1121);
+      vec_test_1.push(4395);
+      vec_test_1.push(4410);
+      vec_test_1.push(4481);
+      
+
+      let mut vec_test_2: Vec<i64> = Vec::new();
+      vec_test_2.push(1124);
+      vec_test_2.push(4395);
+      vec_test_2.push(1126);
+      vec_test_2.push(4493);
+      vec_test_2.push(4502);
+
+      let mut vec_test_res: Vec<i64> = Vec::new();
+      vec_test_res.push(1126);
+      vec_test_res.push(4395);
+      vec_test_res.push(4495);
+      vec_test_res.push(4502);
+
+      let bmoc_1: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_1 };
+      let bmoc_2: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_2 };
+      let bmoc_res: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_res };
+
+      assert_eq!(crate::bmoc::hpx_and(bmoc_1, bmoc_2), bmoc_res);
+    }
+
+    #[pg_test]
+    // Bad test : no cell treatment before the operation
+    // See the full test on https://github.com/cds-astro/cds-healpix-rust/tree/48a5ee396abf852450e4b685f6e107310f39beec
+    fn test_hpx_or() {
+      let mut vec_test_1: Vec<i64> = Vec::new();
+      vec_test_1.push(1099);
+      vec_test_1.push(1121);
+      vec_test_1.push(4395);
+      vec_test_1.push(4410);
+      vec_test_1.push(4481);
+      
+
+      let mut vec_test_2: Vec<i64> = Vec::new();
+      vec_test_2.push(1124);
+      vec_test_2.push(1126);
+      vec_test_2.push(4493);
+      vec_test_2.push(4502);
+      
+
+      let mut vec_test_res: Vec<i64> = Vec::new();
+      vec_test_res.push(1099);
+      vec_test_res.push(1121);
+      vec_test_res.push(4395);
+      vec_test_res.push(4410);
+      vec_test_res.push(4481);
+
+      let bmoc_1: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_1 };
+      let bmoc_2: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_2 };
+      let bmoc_res: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_res };
+
+      assert_eq!(crate::bmoc::hpx_or(bmoc_1, bmoc_2), bmoc_res);
+    }
+}   
