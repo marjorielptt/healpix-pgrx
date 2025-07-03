@@ -44,3 +44,7 @@ The functions come from [the CDS HEALPix repository](https://github.com/cds-astr
 ![Console display](https://github.com/user-attachments/assets/96dd26cc-0666-49f3-8b9c-bb9a5317a6e8)
 
 As you can see on the screenshot, the call to the function returns 19456, which is the right result.
+
+**Author :** Marjorie Lapointe  
+**Language :** Rust   
+**Last version :** July 2025
