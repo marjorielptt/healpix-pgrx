@@ -1,12 +1,12 @@
 [package]
-name = "healpix_pgrx_test"
+name = "healpix_pgrx"
 version = "0.0.1"
 edition = "2021"
 authors = ["Marjorie Lapointe <marjorie.lapointe@zaclys.net>"]
 description = "A Postgres extension for HEALPix in Rust"
-homepage = "https://github.com/marjorielptt/healpix-pgrx-test"
-repository = "https://github.com/marjorielptt/healpix-pgrx-test"
-keywords = ["Postgres", "extension", "HEALPix"]
+homepage = "https://gitlab.com/marjorielptt/healpix-pgrx"
+repository = "https://gitlab.com/marjorielptt/healpix-pgrx"
+keywords = ["postgres", "extension", "healpix", "pgrx", "rust", "cds"]
 readme = "README.md"
 
 [lib]
@@ -17,7 +17,7 @@ name = "pgrx_embed_healpix_pgrx_test"
 path = "./src/bin/pgrx_embed.rs"
 
 [features]
-default = ["pg13"]
+default = ["pg17"]
 pg13 = ["pgrx/pg13", "pgrx-tests/pg13" ]
 pg14 = ["pgrx/pg14", "pgrx-tests/pg14" ]
 pg15 = ["pgrx/pg15", "pgrx-tests/pg15" ]
@@ -26,12 +26,13 @@ pg17 = ["pgrx/pg17", "pgrx-tests/pg17" ]
 pg_test = []
 
 [dependencies]
-pgrx = "=0.14.3"
-cdshealpix = { git = "https://github.com/cds-astro/cds-healpix-rust.git" }
+pgrx = "=0.15.0"
+cdshealpix = { version = "0.8.1", git = "https://github.com/cds-astro/cds-healpix-rust.git" }
+cdsmoc = { git = "https://github.com/cds-astro/cds-moc-rust/blob/31e69f6e85c02043576740839f16f1d1f7e1ac77/src/moc/mod.rs#L370" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-pgrx-tests = "=0.14.3"
+pgrx-tests = "=0.15.0"
 
 [profile.dev]
 panic = "unwind"
