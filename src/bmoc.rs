@@ -8,6 +8,12 @@ use cdshealpix::nested::bmoc::BMOC;
 // For contains
 use cdshealpix::nested::bmoc::Status;
 
+// For the redefinition of the operators' behavior
+use std::ops::Not;
+use std::ops::Add;
+use std::ops::BitOr;
+use std::ops::BitXor;
+
 // BMOC type that is PSQL compatible
 #[derive(PostgresType, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct BMOCpsql {
@@ -126,10 +132,30 @@ pub fn hpx_not(bmoc: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).not().into()
 }
 
+// Redefinition of !'s behavior
+impl Not for BMOCpsql {
+  type Output = BMOCpsql;
+
+  fn not(self) -> BMOCpsql {
+    let bmoc = self;
+    hpx_not(bmoc)
+  }
+}
+
 // And
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_and(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).and(&BMOC::from(other)).into()
+}
+
+// Redefinition of &'s behavior
+impl Add for BMOCpsql {
+  type Output = BMOCpsql;
+
+  fn add(self, other: BMOCpsql) -> BMOCpsql {
+    let bmoc = self;
+    hpx_and(bmoc, other)
+  }
 }
 
 // Or
@@ -138,35 +164,36 @@ pub fn hpx_or(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).or(&BMOC::from(other)).into()
 }
 
+// Redefinition of |'s behavior
+impl BitOr for BMOCpsql {
+  type Output = BMOCpsql;
+
+  fn bitor(self, other: BMOCpsql) -> BMOCpsql {
+    let bmoc = self;
+    hpx_or(bmoc, other)
+  }
+}
+
 // Xor
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_xor(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).xor(&BMOC::from(other)).into()
 }
 
+// Redefinition of ^'s behavior
+impl BitXor for BMOCpsql {
+  type Output = BMOCpsql;
+
+  fn bitxor(self, other: BMOCpsql) -> BMOCpsql {
+    let bmoc = self;
+    hpx_xor(bmoc, other)
+  }
+}
+
 // ------------------------------------------- Ranges representation -----------------------------------------
 
-// #[derive(PostgresType, Debug, Serialize, Deserialize)]
-// pub struct VecRangei64 {
-//   pub vec_field: Vec<RangeInclusive<i64>>
-// }
-// 
-// impl From<Box<[std::ops::Range<u64>]>> for VecRangei64 {
-//   fn from(item: Box<[std::ops::Range<u64>]>) -> Self {
-//     let vec_range_u64 = item.into_vec();
-//     let mut vec_range_i64: VecRangei64 = VecRangei64{ vec_field: Vec::new()};
-//     for range_u64 in vec_range_u64 {
-//         let lower_bound = range_u64.start;
-//         let upper_bound = range_u64.end;
-//         let range_i64 = RangeInclusive::new(lower_bound as i64,upper_bound as i64);
-//         vec_range_i64.vec_field.push(range_i64);
-//     }
-//     vec_range_i64
-//   }
-// }
-
 // Returns a vector of ranges at the maximal depth (=29)
-#[pg_extern]
+#[pg_extern(immutable, parallel_safe)]
 pub fn hpx_to_ranges(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
     let vec_range_u64: Vec<std::ops::Range<u64>> = BMOC::from(bmoc).to_ranges().into_vec();
     let mut vec_range_i64: Vec<pgrx::datum::Range<i64>> = Vec::new();
@@ -179,4 +206,27 @@ pub fn hpx_to_ranges(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
     vec_range_i64
 }
 
+// cdshealpix::nested::is_partial
+pub fn is_partial(raw_value: &i64) -> bool {
+  (*raw_value & 1_i64) == 0_i64
+}
+
 // Returns a vector of the ranges with flag=0 only
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
+  let entries = bmoc.entries;
+  let (flag0, _flag1): (Vec<i64>, Vec<i64>) = 
+    entries.into_iter().partition(|cell| is_partial(cell) == false);
+  let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag0 };
+  hpx_to_ranges(bmoc_res)
+}
+
+// Returns a vector of the ranges with flag=1 only
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_flag_one(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
+  let entries = bmoc.entries;
+  let (_flag0, flag1): (Vec<i64>, Vec<i64>) = 
+    entries.into_iter().partition(|cell| is_partial(cell) == false);
+  let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag1 };
+  hpx_to_ranges(bmoc_res)
+}
