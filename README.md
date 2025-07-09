@@ -46,7 +46,7 @@ Please consult the [healpix-pgrx-test/install](https://gitlab.cds.unistra.fr/mla
   + `healpix_pgrx=# CREATE EXTENSION healpix_pgrx;` : creates the extension corresponding to my repository
   + `healpix_pgrx=# SELECT hash(<arg1>, <arg2>, <arg3>);` : as an example, let's call the Rust function `hash` from HEALPix
 
-![Console display](images/minimal_demo_of_the_extension.png)
+![Console display](https://github.com/marjorielptt/healpix-pgrx/blob/main/images/minimal%20demo%20of%20the%20extension.png)
 
 As you can see on the screenshot, the call to the function returns 19456, which is the right result.
 
