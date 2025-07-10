@@ -102,18 +102,18 @@ pub fn hpx_ring_coverage_approx(depth: i32, cone_lon: f64, cone_lat: f64, cone_r
 // Status type that is PSQL compatible
 #[derive(PostgresEnum, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum Statuspsql {
-    IN,
-    OUT,
-    UNKNOWN,
+    In,
+    Out,
+    Unknown,
 }
 
 // Status -> Statuspsql
 impl From<Status> for Statuspsql {
   fn from(item: Status) -> Self {
     match item {
-        Status::IN => Statuspsql::IN,
-        Status::OUT => Statuspsql::OUT,
-        Status::UNKNOWN => Statuspsql::UNKNOWN,
+        Status::IN => Statuspsql::In,
+        Status::OUT => Statuspsql::Out,
+        Status::UNKNOWN => Statuspsql::Unknown,
     }
   }
 }
