@@ -6,9 +6,11 @@ This repository is based on the use of [PGRX](https://github.com/pgcentralfounda
 
 ## Installation without Rust and PGRX
 
-Please consult the [healpix-pgrx-test/install](https://gitlab.cds.unistra.fr/mlapointe/healpix-pgrx-test/-/tree/main/install) folder of this repository.
+If you want to use the extension without installing Rust and PGRX, please consult the [healpix-pgrx-test/install](https://gitlab.cds.unistra.fr/mlapointe/healpix-pgrx-test/-/tree/main/install) folder of this repository.
 
 ## Installation with Rust and PGRX
+
+If you want to use the extension and install Rust and PGRX (to modify it for example), please read the following instructions.
 
 - **PGRX setup**  
 
