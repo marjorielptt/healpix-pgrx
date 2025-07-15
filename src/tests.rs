@@ -10,6 +10,11 @@ mod tests {
     use pgrx::datum::Range;
     use cdshealpix::nested::n_hash;
     use crate::bmoc::BMOCpsql;
+    use crate::moc::*;
+    use moc::elemset::range::MocRanges;
+    use moc::qty::Hpx;
+    use moc::moc::range::RangeMOC;
+    use moc::moc::RangeMOCIntoIterator;
 
     // Adaptation of HEALPix's Rust tests for PGRX
 
@@ -220,5 +225,19 @@ mod tests {
       let bmoc_res: BMOCpsql = BMOCpsql{ depth_max: 5, entries: vec_test_res };
 
       assert_eq!(crate::bmoc::hpx_or(bmoc_1, bmoc_2), bmoc_res);
+
+      fn test_from_ascii_ivoa() {
+        let smoc_ascii = "3/3 10 4/16-18 22 5/19-20 17/222 28/123456789 29/";
+        let smoc = crate::moc::moc_from_ascii_ivoa(&smoc_ascii).unwrap();
+        let mut rit = smoc.into_range_iter();
+        assert_eq!(rit.depth_max, 29);
+        assert_eq!(rit.next(), Some(493827156..493827160));
+        assert_eq!(rit.next(), Some(3724541952..3741319168));
+        assert_eq!(rit.next(), Some(5348024557502464..5910974510923776));
+        assert_eq!(rit.next(), Some(13510798882111488..21392098230009856));
+        assert_eq!(rit.next(), Some(24769797950537728..25895697857380352));
+        assert_eq!(rit.next(), Some(45035996273704960..49539595901075456));
+        assert_eq!(rit.next(), None);
+      }
     }
 }   
