@@ -44,7 +44,7 @@ impl From<BMOCpsql> for BMOC {
   }
 }
 
-//  ----------------------------------- Coverage types conversions to BMOC ------------------------------------
+//  ----------------------- Creation of a BMOC from different coverage types -------------------------------
 
 // Cone 
 #[pg_extern(immutable, parallel_safe)]
@@ -66,17 +66,17 @@ pub fn hpx_zone_coverage(depth: i32, lon_min: f64, lat_min: f64, lon_max: f64, l
 
 // Type created to adapt the Rust vertex tuple (f64, f64) to PSQL for polygon_coverage
 #[derive(PostgresType, Serialize, Deserialize)]
-pub struct Vertexpsql(f64, f64);
+pub struct VertexPSQL(f64, f64);
 
-impl From<Vertexpsql> for (f64,f64) {
-  fn from(item: Vertexpsql) -> Self {
+impl From<VertexPSQL> for (f64,f64) {
+  fn from(item: VertexPSQL) -> Self {
     (item.0, item.1)
   }
 }
 
 // Polygon
 #[pg_extern(immutable, parallel_safe)]
-pub fn hpx_polygon_coverage(depth: i32, vertices: Vec<Vertexpsql>, exact_solution: bool) -> BMOCpsql {
+pub fn hpx_polygon_coverage(depth: i32, vertices: Vec<VertexPSQL>, exact_solution: bool) -> BMOCpsql {
   let mut vertices_tuple: Vec<(f64,f64)> = Vec::new();
   for vertex in vertices {
     vertices_tuple.push(vertex.into());
@@ -216,7 +216,7 @@ pub fn is_partial(raw_value: &i64) -> bool {
 pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
   let entries = bmoc.entries;
   let (flag0, _flag1): (Vec<i64>, Vec<i64>) = 
-    entries.into_iter().partition(|cell| is_partial(cell) == false);
+    entries.into_iter().partition(|cell| !is_partial(cell));
   let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag0 };
   hpx_to_ranges(bmoc_res)
 }
@@ -226,7 +226,7 @@ pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
 pub fn hpx_flag_one(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
   let entries = bmoc.entries;
   let (_flag0, flag1): (Vec<i64>, Vec<i64>) = 
-    entries.into_iter().partition(|cell| is_partial(cell) == false);
+    entries.into_iter().partition(|cell| !is_partial(cell));
   let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag1 };
   hpx_to_ranges(bmoc_res)
 }
