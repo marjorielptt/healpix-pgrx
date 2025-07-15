@@ -11,6 +11,7 @@ use std::ops::RangeInclusive;
 
 mod bmoc;
 mod tests;
+mod moc;
 
 // HEALPix functions
 
@@ -163,8 +164,7 @@ pub fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
 pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
-  let vec_i64 = unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) } ;
-  vec_i64
+  unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) }
 }
 
 // -------------------------------------------------- nested::internal_edge --------------------------------------------------------------
@@ -172,8 +172,7 @@ pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
 pub fn hpx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::internal_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
-  let vec_i64 = unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) } ;
-  vec_i64
+  unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) }
 }
 
 // -------------------------------------------------- nested::neighbours -----------------------------------------------------------------
