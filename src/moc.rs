@@ -1,132 +1,231 @@
-use pgrx::prelude::*; // default
+use pgrx::prelude::*;   // default
 
+// Library imports
+use pgrx::spi::SpiResult;
+use serde::{Deserialize, Serialize};
+use std::ops::Range as StdRange;
 use moc::moc::range::RangeMOC;
 use moc::qty::Hpx;
 use moc::elemset::range::MocRanges;
+use moc::moc::range::CellSelection;
+use moc::moc::cellcellrange::CellOrCellRangeMOC;
+use moc::deser::ascii::from_ascii_ivoa;
+use moc::moc::HasMaxDepth;
+use moc::elem::cellcellrange::CellOrCellRange;
 
-use pgrx::spi::SpiResult;
-use serde::{Serialize, Deserialize};
-use serde::ser::SerializeStruct;
-use serde::de::Deserializer;
+use crate::bmoc::*;
 
-use std::ops::Range as StdRange;
-use pgrx::datum::Range as PgRange;
-
-// RangeMOC type that is PSQL compatible
-#[derive(PostgresType, Debug)]
+// Creation of a PSQL compatible type of RangeMOC
+#[derive(PostgresType, Debug, Serialize, Deserialize)]
 pub struct RangeMOCPSQL {
     pub depth_max: i32,
-    pub ranges: Vec<PgRange<i64>>,
+    pub ranges: Vec<StdRange<i64>>,
 }
 
-// RangeMOC<u64, Hpx<u64>> -> RangeMOCPSQL
-impl From<RangeMOC<u64, Hpx<u64>>> for RangeMOCPSQL {
-    fn from(item: RangeMOC<u64, Hpx<u64>>) -> Self {
-        let depth_max = item.depth_max() as i32;
-
-        let ranges = item
-            .into_moc_ranges()  // we catch the ranges of the MOC
-            .iter()             // we iterate on each StdRange<u32> in the Box<[StdRange<u32>]>
-            .map(|std_range| {
-                PgRange::new(std_range.start as i64, std_range.end as i64)     // we convert every StdRange in a PgRange
-            })
-            .collect();
-
-        RangeMOCPSQL { depth_max, ranges }
-    }
-}
-
-// RangeMOCPSQL -> RangeMOC<u64, Hpx<u64>>
-impl From<RangeMOCPSQL> for RangeMOC<u64, Hpx<u64>> {
+// RangeMOCPSQL -> RangeMOC
+impl From<RangeMOCPSQL> for RangeMOC<u64, Hpx::<u64>> {
     fn from(item: RangeMOCPSQL) -> Self {
-        let ranges_u64: Vec<StdRange<u64>> = item
-            .ranges         // we catch the Vec<PgRange<i64>>
-            .into_iter()    // we iterate on each PgRange<i64> in the Vec<PgRange<i64>>
-            .map(|pg_range| {
-                let start = match pg_range.lower() {
-                    Some(RangeBound::Inclusive(lower_bound)) => *lower_bound as u64,  
-                    Some(RangeBound::Exclusive(lower_bound)) => (*lower_bound + 1) as u64, // we work with u64 (integers) so an exclusive lower bound means the bound+1 for StdRange (default: lower bound is inclusive for StdRange)
-                                                                                           // MIGHT BE BETTER TO WORK WITH A BOOL (for example let exclusive: bool = true;)
-                    Some(RangeBound::Infinite) | None => panic!("Unexpected unbounded lower range"),
-                };
-                let end = match pg_range.upper() {
-                    Some(RangeBound::Inclusive(upper_bound)) => (*upper_bound + 1) as u64, // we work with u64 (integers) so an inclusive upper bound means the bound+1 for StdRange (default: upper bound is exclusive for StdRange)
-                    Some(RangeBound::Exclusive(upper_bound)) => *upper_bound as u64,
-                    Some(RangeBound::Infinite) | None => panic!("Unexpected unbounded upper range"),
-                };
-                StdRange { start, end }     // we convert every PgRange in a StdRange
-            })
-            .collect();
+        let mut ranges_u64 = Vec::new();
 
-        let moc_ranges = MocRanges::new_unchecked(ranges_u64);      // We create the MocRanges from the StdRange
-
-        RangeMOC::new(item.depth_max as u8, moc_ranges)     
-    }
-}
-
-// Implementation of Serialize for RangeMOCPSQL
-impl Serialize for RangeMOCPSQL {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer
-    {
-        let mut state = serializer.serialize_struct("RangeMOCPSQL", 2)?;    // we serialize the structure RangeMOCPSQL which has 2 fields
-        state.serialize_field("depth_max", &self.depth_max)?;       // we serialize the depth_max field
-
-        let std_ranges: Vec<std::ops::Range<i64>> = self.ranges.iter().map(|pg_range| {
-            let start = match pg_range.lower() {
-                Some(pgrx::datum::RangeBound::Inclusive(lower_bound)) => *lower_bound,
-                Some(pgrx::datum::RangeBound::Exclusive(lower_bound)) => *lower_bound + 1,
-                Some(RangeBound::Infinite) | None => panic!("Unexpected unbounded lower range"),
-            };
-        
-            let end = match pg_range.upper() {
-                Some(pgrx::datum::RangeBound::Inclusive(upper_bound)) => *upper_bound + 1,
-                Some(pgrx::datum::RangeBound::Exclusive(upper_bound)) => *upper_bound,
-                Some(RangeBound::Infinite) | None => panic!("Unexpected unbounded upper range"),
-            };
-        
-            std::ops::Range { start, end }
-        }).collect();
-
-        state.serialize_field("ranges", &std_ranges)?;      // we serialize the StdRange bc it's an equivalent structure of PgRange to JSON
-        state.end()
-    }
-}
-
-// Implementation of Deserialize for RangeMOCPSQL
-impl<'de> Deserialize<'de> for RangeMOCPSQL {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Inner {
-            depth_max: i32,
-            ranges: Vec<std::ops::Range<i64>>,
+        for r in item.ranges {
+            ranges_u64.push(StdRange{start : r.start as u64, end: r.end as u64});
         }
 
-        let inner = Inner::deserialize(deserializer)?;
-
-        let ranges = inner
-            .ranges
-            .into_iter()
-            .map(|std_range| PgRange::new(std_range.start, std_range.end))
-            .collect();
-
-        Ok(RangeMOCPSQL {
-            depth_max: inner.depth_max,
-            ranges,
-        })
+        RangeMOC::new(item.depth_max as u8, MocRanges::new_unchecked(ranges_u64))
     }
 }
 
-// MOC -> Ascii
+// RangeMOC -> RangeMOCPSQL
+impl From<RangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
+    fn from(item: RangeMOC<u64, Hpx::<u64>>) -> Self {
+        let ranges_u64 = item
+            .clone()
+            .into_moc_ranges()
+            .ranges()
+            .0
+            .clone()
+            .into_vec();
+        let mut ranges_i64 = Vec::new();
+
+        for r in ranges_u64 {
+            ranges_i64.push(unsafe {std::mem::transmute::<StdRange<u64>, StdRange<i64>>(r)});
+        }
+
+        RangeMOCPSQL {depth_max: item.depth_max() as i32, ranges: ranges_i64}
+    }
+}
+
+// RangeMOCPSQL -> Ascii
 #[pg_extern(immutable, parallel_safe)]
-// Original signature : pub fn to_ascii(&self) -> Result<String, AsciiError>
 pub fn hpx_to_ascii(moc: RangeMOCPSQL) -> SpiResult<String> {
-    let range_moc: RangeMOC<u64, Hpx<u64>> = moc.into();
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
+
     match range_moc.to_ascii() {
         Ok(ascii) => Ok(ascii),
         Err(e) => error!("Failed to convert RangeMOC to ASCII: {}", e),
     }
+}
+
+// Creation of a PSQL compatible type of CellOrCellRangeMOC
+#[derive(PostgresType, Debug, Serialize, Deserialize)]
+pub struct CellOrCellRangeMOCPSQL {
+    pub depth_max: i32,
+    pub ranges: Vec<CellOrCellRangePSQL>,
+}
+
+// Creation of a PSQL compatible type of CellOrCellRange
+#[derive(PostgresEnum, Debug, Serialize, Deserialize)]
+pub enum CellOrCellRangePSQL {CellPSQL, CellRangePSQL}
+
+// Creation of a PSQL compatible type of Cell
+#[derive(PostgresType, Debug, Serialize, Deserialize)]
+pub struct CellPSQL {
+    pub depth_max: i32,
+    pub idx: i32,
+}
+
+// Creation of a PSQL compatible type of Cell
+#[derive(PostgresType, Debug, Serialize, Deserialize)]
+pub struct CellRangePSQL {
+    pub depth_max: i32,
+    pub range: StdRange<i32>,
+}
+
+// CellOrCellRangeMOC -> RangeMOCPSQL
+impl From<CellOrCellRangeMOC<u32, Hpx::<u32>>> for RangeMOCPSQL {
+    fn from(item: CellOrCellRangeMOC<u32, Hpx::<u32>>) -> Self {
+        let depth_max = item.depth_max() as i32;
+        let vec_moc = item.moc_elems().0.0.into_vec();
+        let mut vec_u32 = Vec::new();
+        for elem in vec_moc {
+            match elem {
+                CellOrCellRange::Cell(cell) => vec_u32.push(StdRange {start: cell.idx, end: cell.idx}),
+                CellOrCellRange::CellRange(cell_range) => vec_u32.push(cell_range.range),
+            }
+        }
+        let vec_i64 = unsafe {std::mem::transmute::<Vec<StdRange<u32>>, Vec<StdRange<i64>>>(vec_u32)};
+        RangeMOCPSQL{depth_max, ranges: vec_i64}
+    }
+}
+
+// Ascii -> RangeMOCPSQL
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
+    match from_ascii_ivoa(input) {
+        Ok(range_moc) => Ok(range_moc.into()),
+        Err(e) => error!("Failed to convert RangeMOC to ASCII: {}", e),
+    }
+}
+
+// ------------------------------------------------ Contains -----------------------------------------------
+
+// Tests if the cell is in the MOC 
+// Remark : the coordinates are in radians
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_is_in(moc: RangeMOCPSQL, lon: f64, lat: f64) -> bool {
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
+    range_moc.is_in(lon, lat)
+}
+
+//  ----------------------- Creation of a BMOC from different coverage types -------------------------------
+
+// Creation of a PSQL compatible type of CellSelection
+#[derive(PostgresEnum, Debug, Serialize, Deserialize)]
+pub enum CellSelectionPSQL {
+    All,
+    Inside,
+    Border,
+}
+
+// CellSelectionPSQL -> CellSelection
+impl From<CellSelectionPSQL> for CellSelection {
+    fn from(item: CellSelectionPSQL) -> Self {
+        match item {
+            CellSelectionPSQL::All => CellSelection::All,
+            CellSelectionPSQL::Inside => CellSelection::Inside,
+            CellSelectionPSQL::Border => CellSelection::Border,
+        }
+    }
+}
+
+// Creation of a MOC from a Cone
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_cone(
+    lon: f64,
+    lat: f64,
+    radius: f64,
+    depth: i32,
+    delta_depth: i32,
+    selection: CellSelectionPSQL
+) -> RangeMOCPSQL
+{
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cone(lon, lat, radius, depth as u8, delta_depth as u8, selection.into());
+    range_moc.into()
+}
+
+// Creation of a MOC from an EllipticalCone
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_elliptical_cone(
+    lon: f64,
+    lat: f64,
+    a: f64,
+    b: f64,
+    pa: f64,
+    depth: i32,
+    delta_depth: i32,
+    selection: CellSelectionPSQL
+) -> RangeMOCPSQL
+{
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth as u8, delta_depth as u8, selection.into());
+    range_moc.into()
+}
+
+// Creation of a MOC from a Polygon
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_polygon(
+    vertices: Vec<VertexPSQL>,
+    complement: bool,
+    depth: i32,
+    selection: CellSelectionPSQL
+) -> RangeMOCPSQL
+{
+    let mut vertices_tuple: Vec<(f64,f64)> = Vec::new();
+    for vertex in vertices {
+      vertices_tuple.push(vertex.into());
+    }
+    let vertices_as_array = vertices_tuple.as_slice();
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_polygon(vertices_as_array, complement, depth as u8, selection.into());
+    range_moc.into()
+}
+
+// Creation of a MOC from a Box
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_box(
+    lon: f64,
+    lat: f64,
+    a: f64,
+    b: f64,
+    pa: f64,
+    depth: i32,
+    selection: CellSelectionPSQL
+) -> RangeMOCPSQL
+{
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_box(lon, lat, a, b, pa, depth as u8, selection.into());
+    range_moc.into()
+}
+
+// Creation of a MOC from a Ring
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_from_ring(
+    lon: f64,
+    lat: f64,
+    radius_int: f64,
+    radius_ext: f64,
+    depth: i32,
+    delta_depth: i32,
+    selection: CellSelectionPSQL
+) -> RangeMOCPSQL
+{
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_ring(lon, lat, radius_int, radius_ext, depth as u8, delta_depth as u8, selection.into());
+    range_moc.into()
 }
