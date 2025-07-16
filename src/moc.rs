@@ -23,29 +23,6 @@ pub struct RangeMOCPSQL {
     pub ranges: Vec<StdRange<i64>>,
 }
 
-// For the tests on moc_from_ascii_ivoa
-impl RangeMOCPSQL {
-    pub fn into_range_iter(self) -> RangeMocIter {
-        RangeMocIter {
-            depth_max: self.depth_max,
-            iter: self.ranges.into_iter(),
-        }
-    }
-}
-
-pub struct RangeMocIter {
-    pub depth_max: i32,
-    pub iter: std::vec::IntoIter<StdRange<i64>>,
-}
-
-impl Iterator for RangeMocIter {
-    type Item = StdRange<i64>;
-    
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-
 // RangeMOCPSQL -> RangeMOC
 impl From<RangeMOCPSQL> for RangeMOC<u64, Hpx::<u64>> {
     fn from(item: RangeMOCPSQL) -> Self {
