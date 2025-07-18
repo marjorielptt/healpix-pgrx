@@ -1,19 +1,27 @@
 use pgrx::prelude::*;   // default
 
 // Library imports
-use pgrx::spi::SpiResult;
 use serde::{Deserialize, Serialize};
-use std::ops::Range as StdRange;
-use moc::moc::range::RangeMOC;
-use moc::qty::Hpx;
-use moc::elemset::range::MocRanges;
-use moc::moc::range::CellSelection;
-use moc::moc::cellcellrange::CellOrCellRangeMOC;
-use moc::deser::ascii::from_ascii_ivoa;
-use moc::moc::HasMaxDepth;
-use moc::elem::cellcellrange::CellOrCellRange;
-use std::ops::{Not, Add, BitOr, BitXor, Sub};
-
+use pgrx::{
+    spi::SpiResult,
+    datum::Range as PgRange
+};
+use std::ops::{
+    Range as StdRange,
+    Not, BitAnd, BitOr, BitXor, Sub
+};
+use moc::{
+    moc::{
+        range::RangeMOC,
+        range::CellSelection,
+        cellcellrange::CellOrCellRangeMOC,
+        HasMaxDepth
+    },
+    elemset::range::MocRanges,
+    qty::Hpx,
+    deser::ascii::from_ascii_ivoa,
+    elem::cellcellrange::CellOrCellRange
+};
 use crate::bmoc::*;
 
 // Creation of a PSQL compatible type of RangeMOC
@@ -21,6 +29,41 @@ use crate::bmoc::*;
 pub struct RangeMOCPSQL {
     pub depth_max: i32,
     pub ranges: Vec<StdRange<i64>>,
+}
+
+// Creation of a StdRange type that is in the current crate to satisfy the orphan rule 
+pub struct StdRangeCrate(pub std::ops::Range<i64>);
+
+// PgRange<i64> -> StdRangeCrate<i64>
+impl From<PgRange<i64>> for StdRangeCrate {
+    fn from(item: PgRange<i64>) -> StdRangeCrate {
+        let start: i64 = match item.lower() {
+            Some(&RangeBound::Exclusive(lower_bound)) => lower_bound+1,
+            Some(&RangeBound::Inclusive(lower_bound)) => lower_bound,
+            Some(RangeBound::Infinite) => panic!("Infinite RangeBound"),
+            None => panic!("No RangeBound"),
+        };
+        let end: i64 = match item.upper() {
+            Some(&RangeBound::Exclusive(upper_bound)) => upper_bound,
+            Some(&RangeBound::Inclusive(upper_bound)) => upper_bound+1,
+            Some(RangeBound::Infinite) => panic!("Infinite RangeBound"),
+            None => panic!("No RangeBound"),
+        };
+        StdRangeCrate( StdRange {start, end})
+    }
+}
+
+// Creation of a MOC
+#[pg_extern(immutable, parallel_safe)]
+pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> RangeMOCPSQL {
+    let mut std_ranges: Vec<StdRange<i64>> = Vec::new();
+
+    for r in ranges {
+        let new_range: StdRangeCrate = r.into();
+        std_ranges.push(new_range.0);
+    }
+    
+    RangeMOCPSQL { depth_max, ranges:std_ranges }
 }
 
 // RangeMOCPSQL -> RangeMOC
@@ -270,14 +313,21 @@ pub fn moc_intersection(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL 
     moc_and(moc, other)
 }
 
-// Redefinition of &'s behavior
-impl Add for RangeMOCPSQL {
+// Redefinition of &'s behavior for Rust utilisations
+impl BitAnd for RangeMOCPSQL {
   type Output = RangeMOCPSQL;
 
-  fn add(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
+  fn bitand(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc = self;
     moc_and(moc, other)
   }
+}
+
+// Redefinition of &'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(&)]
+fn my_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    moc & other
 }
 
 // Or
@@ -294,7 +344,7 @@ pub fn moc_union(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc_or(moc, other)
 }
 
-// Redefinition of |'s behavior
+// Redefinition of |'s behavior for Rust utilisations
 impl BitOr for RangeMOCPSQL {
   type Output = RangeMOCPSQL;
 
@@ -302,6 +352,13 @@ impl BitOr for RangeMOCPSQL {
     let moc = self;
     moc_or(moc, other)
   }
+}
+
+// Redefinition of |'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(|)]
+fn my_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    moc | other
 }
 
 // Xor
@@ -312,7 +369,7 @@ pub fn moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc_std.xor(&other_std).into()
 }
 
-// Redefinition of ^'s behavior
+// Redefinition of ^'s behavior for Rust utilisations
 impl BitXor for RangeMOCPSQL {
   type Output = RangeMOCPSQL;
 
@@ -320,6 +377,13 @@ impl BitXor for RangeMOCPSQL {
     let moc = self;
     moc_xor(moc, other)
   }
+}
+
+// Redefinition of ^'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(^)]
+fn my_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    moc ^ other
 }
 
 // Minus
@@ -330,7 +394,7 @@ pub fn moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc_std.minus(&other_std).into()
 }
 
-// Redefinition of -'s behavior
+// Redefinition of -'s behavior for Rust utilisations
 impl Sub for RangeMOCPSQL {
   type Output = RangeMOCPSQL;
 
@@ -338,4 +402,11 @@ impl Sub for RangeMOCPSQL {
     let moc = self;
     moc_minus(moc, other)
   }
+}
+
+// Redefinition of -'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(-)]
+fn my_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    moc - other
 }
