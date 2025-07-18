@@ -1,5 +1,8 @@
 -- this setup file is run immediately after the regression database is (re)created
 -- the file is optional but you likely want to create the extension
+
+-- CONFIGURATION
+
 DROP EXTENSION healpix_pgrx_test;
 CREATE EXTENSION healpix_pgrx_test;
 
@@ -137,3 +140,16 @@ CREATE TABLE tyc2 (
 
 -- Copy of the data from the csv to the table
 COPY tyc2 FROM '/home/mlapointe/Documents/Ressources/csv/tycho.csv' (FORMAT csv, DELIMITER ',', NULL '', HEADER false);
+
+-- FUNCTIONS
+
+-- Recuperation of a MOC from a row of moc_table
+-- (The conversion int8multirange -> int8range[] is necessary)
+CREATE FUNCTION moc_from_moc_table(idx integer) RETURNS rangemocpsql AS '
+    SELECT create_range_moc_psql(
+        (SELECT depth_max FROM moc_table WHERE id = idx),
+        (SELECT array_agg(r) FROM moc_table, LATERAL unnest(ranges) AS r WHERE id = idx)
+    );'
+LANGUAGE SQL;
+
+-- 
