@@ -10,7 +10,7 @@ use cdshealpix::nested::bmoc::Status;
 
 // For the redefinition of the operators' behavior
 use std::ops::Not;
-use std::ops::Add;
+use std::ops::BitAnd;
 use std::ops::BitOr;
 use std::ops::BitXor;
 
@@ -149,10 +149,10 @@ pub fn hpx_and(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
 }
 
 // Redefinition of &'s behavior
-impl Add for BMOCpsql {
+impl BitAnd for BMOCpsql {
   type Output = BMOCpsql;
 
-  fn add(self, other: BMOCpsql) -> BMOCpsql {
+  fn bitand(self, other: BMOCpsql) -> BMOCpsql {
     let bmoc = self;
     hpx_and(bmoc, other)
   }
