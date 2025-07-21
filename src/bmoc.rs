@@ -21,6 +21,12 @@ pub struct BMOCpsql {
     pub entries: Vec<i64>,
 }
 
+// Creation of a BMOC
+#[pg_extern(immutable, parallel_safe)]
+pub fn create_bmoc_psql(depth_max: i32, entries: Vec<i64>) -> BMOCpsql {
+    BMOCpsql { depth_max, entries }
+}
+
 // BMOC -> BMOCpsql 
 impl From<BMOC> for BMOCpsql {
   fn from(item: BMOC) -> Self {
