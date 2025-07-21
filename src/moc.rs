@@ -4,7 +4,7 @@ use pgrx::prelude::*;   // default
 use serde::{Deserialize, Serialize};
 use pgrx::{
     spi::SpiResult,
-    datum::Range as PgRange
+    datum::Range as PgRange,
 };
 use std::ops::{
     Range as StdRange,
@@ -29,6 +29,29 @@ use crate::bmoc::*;
 pub struct RangeMOCPSQL {
     pub depth_max: i32,
     pub ranges: Vec<StdRange<i64>>,
+}
+
+// Provides the part of the query that turns the ranges into betweens
+// Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
+#[pg_extern(immutable, parallel_safe)]
+pub fn to_between(element: String, moc: RangeMOCPSQL) -> String {
+    let mut res = String::new();
+    let len = moc.ranges.len();
+
+    for (i, r) in moc.ranges.iter().enumerate() {
+        res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
+        if i < len - 1 {
+            res += " OR ";
+        }
+    }
+    res
+}
+
+// Provides the complete query that returns the mocs that contain the element in at least one of their ranges
+// Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
+#[pg_extern(immutable, parallel_safe)]
+pub fn moc_contains_element_query(table: String, element: String, moc: RangeMOCPSQL) -> String {
+    format!("SELECT * FROM {} WHERE {};", table, to_between(element, moc))
 }
 
 // Creation of a StdRange type that is in the current crate to satisfy the orphan rule 
