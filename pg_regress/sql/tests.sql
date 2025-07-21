@@ -37,8 +37,20 @@ SELECT create_bmoc_psql(
 -- Function test : hpx_elliptical_cone
 SELECT hpx_elliptical_cone_coverage(3, RADIANS(36.80105218), RADIANS(56.78028536), RADIANS(14.93), RADIANS(4.93), RADIANS(75.0));
 
--- PROBLEMATIC QUERY (doesn't use the bitmap index scan)
+-- PROBLEMATIC QUERY FOR MOCs : doesn't use the bitmap index scan
 -- SELECT * FROM tyc2 WHERE hpx_hash(29, ra_icrs_, de_icrs_) <@ int8multirange(int8range(0,1000), int8range(150,250));
 
--- SOLUTION (provides a query you have to copy and paste and this query uses the bitmap index scan)
+-- SOLUTION FOR MOCs : provides a query you have to copy and paste and this query uses the bitmap index scan
 SELECT moc_contains_element_query('tyc2', 'hpx_hash(29, ra_icrs_, de_icrs_)', create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]));
+
+-- FOR BMOCs : Same query but for BMOCs
+SELECT bmoc_contains_element_query(
+  'tyc2',
+  'hpx_hash(29, ra_icrs_, de_icrs_)',
+  create_bmoc_psql(
+    29,
+    ARRAY[
+      8202, 8203, 8206, 8207, 8218, 8224, 8225, 8226, 8227, 8228, 8229, 8230, 8231, 8232, 8233
+    ]
+  )
+);
