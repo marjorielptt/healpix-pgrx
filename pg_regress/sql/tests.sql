@@ -14,6 +14,10 @@ INSERT INTO moc_table (id, depth_max, ranges) VALUES (1, 29, int8multirange(int8
 INSERT INTO moc_table (id, depth_max, ranges) VALUES (2, 28, int8multirange(int8range(500,600)));
 INSERT INTO moc_table (id, depth_max, ranges) VALUES (3, 27, int8multirange(int8range(150,250), int8range(350,450), int8range(550,650)));
 
+-- Create a MOC from a row of moc_table
+-- Make sure you created the function moc_from_moc_table() whose code is in ../setup.sql
+SELECT moc_from_moc_table(2);
+
 -- Function test : moc_to_ascii
 SELECT moc_to_ascii(create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]));
 
@@ -38,19 +42,10 @@ SELECT create_bmoc_psql(
 SELECT hpx_elliptical_cone_coverage(3, RADIANS(36.80105218), RADIANS(56.78028536), RADIANS(14.93), RADIANS(4.93), RADIANS(75.0));
 
 -- PROBLEMATIC QUERY FOR MOCs : doesn't use the bitmap index scan
--- SELECT * FROM tyc2 WHERE hpx_hash(29, ra_icrs_, de_icrs_) <@ int8multirange(int8range(0,1000), int8range(150,250));
+-- SELECT * FROM hip_table WHERE hpx_hash(29, raicrs, deicrs) <@ int8multirange(int8range(100,200), int8range(300,400));
 
--- SOLUTION FOR MOCs : provides a query you have to copy and paste and this query uses the bitmap index scan
-SELECT moc_contains_element_query('tyc2', 'hpx_hash(29, ra_icrs_, de_icrs_)', create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]));
+-- SOLUTION : we create a range that only contains the element we want to index the table with
+CREATE INDEX hpx_hash_hip_idx ON hip_table USING GIST(hpx_hash_range(29,raicrs,deicrs));
 
--- FOR BMOCs : Same query but for BMOCs
-SELECT bmoc_contains_element_query(
-  'tyc2',
-  'hpx_hash(29, ra_icrs_, de_icrs_)',
-  create_bmoc_psql(
-    29,
-    ARRAY[
-      8202, 8203, 8206, 8207, 8218, 8224, 8225, 8226, 8227, 8228, 8229, 8230, 8231, 8232, 8233
-    ]
-  )
-);
+-- Then this query uses the index
+SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ int8multirange('[100, 200)', '[300,400)');
