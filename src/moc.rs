@@ -99,28 +99,30 @@ impl From<RangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
     }
 }
 
-// Provides the part of the query that turns the ranges into betweens
-// Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
-#[pg_extern(immutable, parallel_safe)]
-pub fn moc_to_between(element: String, moc: RangeMOCPSQL) -> String {
-    let mut res = String::new();
-    let len = moc.ranges.len();
-
-    for (i, r) in moc.ranges.iter().enumerate() {
-        res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
-        if i < len - 1 {
-            res += " OR ";
-        }
-    }
-    res
-}
-
-// Provides the complete query that returns the mocs that contain the element in at least one of their ranges
-// Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
-#[pg_extern(immutable, parallel_safe)]
-pub fn moc_contains_element_query(table: String, element: String, moc: RangeMOCPSQL) -> String {
-    format!("SELECT * FROM {} WHERE {};", table, moc_to_between(element, moc))
-}
+// UNNECESSARY : We use hpx_hash_range
+//
+// // Provides the part of the query that turns the ranges into betweens
+// // Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
+// #[pg_extern(immutable, parallel_safe)]
+// pub fn moc_to_between(element: String, moc: RangeMOCPSQL) -> String {
+//     let mut res = String::new();
+//     let len = moc.ranges.len();
+// 
+//     for (i, r) in moc.ranges.iter().enumerate() {
+//         res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
+//         if i < len - 1 {
+//             res += " OR ";
+//         }
+//     }
+//     res
+// }
+// 
+// // Provides the complete query that returns the mocs that contain the element in at least one of their ranges
+// // Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
+// #[pg_extern(immutable, parallel_safe)]
+// pub fn moc_contains_element_query(table: String, element: String, moc: RangeMOCPSQL) -> String {
+//     format!("SELECT * FROM {} WHERE {};", table, moc_to_between(element, moc))
+// }
 
 // RangeMOCPSQL -> Ascii
 #[pg_extern(immutable, parallel_safe)]
