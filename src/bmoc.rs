@@ -52,30 +52,32 @@ impl From<BMOCpsql> for BMOC {
   }
 }
 
-// Provides the part of the query that turns the ranges into betweens
-// Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
-#[pg_extern(immutable, parallel_safe)]
-pub fn bmoc_to_between(element: String, bmoc: BMOCpsql) -> String {
-    let mut res = String::new();
-    let hpx_bmoc: BMOC = bmoc.into();
-    let flagged_ranges: Vec<(StdRange<u64>, bool)> = hpx_bmoc.to_flagged_ranges();
-    let len = flagged_ranges.len();
-
-    for (i, (r, _)) in flagged_ranges.iter().enumerate() {
-        res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
-        if i < len - 1 {
-            res += " OR ";
-        }
-    }
-    res
-}
-
-// Provides the complete query that returns the bmocs that contain the element in at least one of their ranges
-// Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
-#[pg_extern(immutable, parallel_safe)]
-pub fn bmoc_contains_element_query(table: String, element: String, bmoc: BMOCpsql) -> String {
-    format!("SELECT * FROM {} WHERE {};", table, bmoc_to_between(element, bmoc))
-}
+// UNNECESSARY : We use hpx_hash_range
+//
+// // Provides the part of the query that turns the ranges into betweens
+// // Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
+// #[pg_extern(immutable, parallel_safe)]
+// pub fn bmoc_to_between(element: String, bmoc: BMOCpsql) -> String {
+//     let mut res = String::new();
+//     let hpx_bmoc: BMOC = bmoc.into();
+//     let flagged_ranges: Vec<(StdRange<u64>, bool)> = hpx_bmoc.to_flagged_ranges();
+//     let len = flagged_ranges.len();
+// 
+//     for (i, (r, _)) in flagged_ranges.iter().enumerate() {
+//         res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
+//         if i < len - 1 {
+//             res += " OR ";
+//         }
+//     }
+//     res
+// }
+// 
+// // Provides the complete query that returns the bmocs that contain the element in at least one of their ranges
+// // Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
+// #[pg_extern(immutable, parallel_safe)]
+// pub fn bmoc_contains_element_query(table: String, element: String, bmoc: BMOCpsql) -> String {
+//     format!("SELECT * FROM {} WHERE {};", table, bmoc_to_between(element, bmoc))
+// }
 
 //  ----------------------- Creation of a BMOC from different coverage types -------------------------------
 
