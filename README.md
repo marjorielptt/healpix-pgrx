@@ -1,6 +1,6 @@
 # PostgreSQL extension for HEALPix in Rust
 
-By using this project, you will be able to call [HEALPix](https://github.com/cds-astro/cds-healpix-rust.git) Rust functions from PostgreSQL.
+By using this project, you will be able to call [HEALPix](https://github.com/cds-astro/cds-healpix-rust.git) and [MOC](https://github.com/cds-astro/cds-moc-rust/tree/31e69f6e85c02043576740839f16f1d1f7e1ac77) Rust functions from PostgreSQL.
 
 This repository is based on the use of [PGRX](https://github.com/pgcentralfoundation/pgrx/tree/develop), a framework created to develop PostgreSQL extensions in Rust .   
 
@@ -48,7 +48,7 @@ If you want to use the extension and install Rust and PGRX (to modify it for exa
   + `healpix_pgrx=# CREATE EXTENSION healpix_pgrx;` : creates the extension corresponding to my repository
   + `healpix_pgrx=# SELECT hash(<arg1>, <arg2>, <arg3>);` : as an example, let's call the Rust function `hash` from HEALPix
 
-![Console display](https://github.com/marjorielptt/healpix-pgrx/blob/main/images/minimal%20demo%20of%20the%20extension.png)
+![Console display](images/minimal_demo_of_the_extension.png)
 
 As you can see on the screenshot, the call to the function returns 19456, which is the right result.
 
