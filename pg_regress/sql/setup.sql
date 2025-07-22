@@ -3,8 +3,8 @@
 
 -- CONFIGURATION
 
-DROP EXTENSION healpix_pgrx_test CASCADE;
-CREATE EXTENSION healpix_pgrx_test;
+DROP EXTENSION healpix_pgrx CASCADE;
+CREATE EXTENSION healpix_pgrx;
 
 -- Creation of the table hip_table
 CREATE TABLE hip_table(HIP bigint, Vmag double precision, RAICRS double precision, DEICRS double precision);
