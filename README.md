@@ -46,7 +46,7 @@ If you want to use the extension and install Rust and PGRX (to modify it for exa
 
   + `healpix_pgrx=# DROP EXTENSION healpix_pgrx;` : **if you already created an extension called `healpix_pgrx`**, you have to manually drop and recreate it for Postgres to consider the latest updates of your code
   + `healpix_pgrx=# CREATE EXTENSION healpix_pgrx;` : creates the extension corresponding to my repository
-  + `healpix_pgrx=# SELECT hash(<arg1>, <arg2>, <arg3>);` : as an example, let's call the Rust function `hash` from HEALPix
+  + `healpix_pgrx=# SELECT hpx_hash(<arg1>, <arg2>, <arg3>);` : as an example, let's call the Rust function `hash` from HEALPix
 
 ![Console display](images/minimal_demo_of_the_extension.png)
 
