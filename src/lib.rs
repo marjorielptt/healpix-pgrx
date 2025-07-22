@@ -23,6 +23,14 @@ pub fn hpx_hash(depth: i32, lon:f64, lat:f64) -> i64 {
   cdshealpix::nested::hash(depth as u8, lon.to_radians(), lat.to_radians()) as i64
 }
 
+#[pg_extern(immutable, parallel_safe)]
+#[inline]
+/// Test
+pub fn hpx_hash_range(depth: i32, lon:f64, lat:f64) -> pgrx::datum::Range<i64> {
+  let hash_value: i64 = cdshealpix::nested::hash(depth as u8, lon.to_radians(), lat.to_radians()) as i64;
+  pgrx::datum::Range::<i64>::new(hash_value, hash_value + 1 )
+}
+
 // -------------------------------------------------- best_starting_depth -----------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
