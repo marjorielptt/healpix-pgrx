@@ -39,7 +39,7 @@ SELECT create_bmoc_psql(
 );
 
 -- Function test : hpx_elliptical_cone
-SELECT hpx_elliptical_cone_coverage(3, RADIANS(36.80105218), RADIANS(56.78028536), RADIANS(14.93), RADIANS(4.93), RADIANS(75.0));
+SELECT hpx_elliptical_cone_coverage(3, 36.80105218, 56.78028536, 14.93, 4.93, 75.0);
 
 -- PROBLEMATIC QUERY FOR MOCs : doesn't use the bitmap index scan
 -- SELECT * FROM hip_table WHERE hpx_hash(29, raicrs, deicrs) <@ int8multirange(int8range(100,200), int8range(300,400));
@@ -49,3 +49,6 @@ CREATE INDEX hpx_hash_hip_idx ON hip_table USING GIST(hpx_hash_range(29,raicrs,d
 
 -- Then this query uses the index
 SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ int8multirange('[100, 200)', '[300,400)');
+
+-- Same query but with a function that returns the ranges of a moc
+SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_ranges(create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]));
