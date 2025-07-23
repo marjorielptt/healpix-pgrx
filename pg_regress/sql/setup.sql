@@ -14,6 +14,7 @@ COPY hip_table(HIP, Vmag, RAICRS, DEICRS) FROM PROGRAM 'tail -n +1 /home/mlapoin
 
 -- Creation of an index on hpx_hash(29, raicrs, deicrs) for hip_table
 CREATE INDEX hpx_hash_hip_idx ON hip_table (hpx_hash(29, raicrs, deicrs));
+CREATE INDEX hpx_hash_range_hip_idx ON hip_table USING GIST(hpx_hash_range(29, raicrs, deicrs));
 
 -- Creation of the table c1239hip_main
 CREATE TABLE c1239hip_main (
@@ -150,10 +151,51 @@ CREATE INDEX hpx_hash_tyc2_idx ON tyc2 (hpx_hash(29, ra_icrs_, de_icrs_));
 -- FUNCTIONS
 
 -- Recuperation of a MOC from a row of moc_table
--- (The conversion int8multirange -> int8range[] is necessary)
 CREATE FUNCTION moc_from_moc_table(idx integer) RETURNS rangemocpsql AS '
     SELECT create_range_moc_psql(
         (SELECT depth_max FROM moc_table WHERE id = idx),
         (SELECT array_agg(r) FROM moc_table, LATERAL unnest(ranges) AS r WHERE id = idx)
     );'
 LANGUAGE SQL;
+
+-- int8range[] -> int8multirange
+CREATE FUNCTION to_int8multirange(element int8range[]) RETURNS int8multirange AS '
+    SELECT range_agg(r) FROM unnest(element) AS r;
+    '
+LANGUAGE SQL;
+
+-- int8range[] -> int8multirange
+CREATE OR REPLACE FUNCTION ranges_to_multirange(r int8range[])
+RETURNS int8multirange AS $$
+DECLARE
+    result int8multirange;
+BEGIN
+    EXECUTE format(
+        'SELECT ''{%s}''::int8multirange',
+        array_to_string(r, ',')
+    )
+    INTO result;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+-- Equivalent of the crate::moc::to_ranges() function in Rust 
+-- but this function provites the int8range[] -> int8multirange conversion
+-- so it works directly in postgres
+CREATE OR REPLACE FUNCTION to_ranges_psql(moc rangemocpsql)
+RETURNS int8multirange AS $$
+DECLARE
+    r int8range[];
+    result int8multirange;
+BEGIN
+    r := to_ranges(moc);
+    EXECUTE format(
+        'SELECT ''{%s}''::int8multirange',
+        array_to_string(r, ',')
+    )
+    INTO result;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
