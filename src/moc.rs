@@ -15,14 +15,56 @@ use moc::{
         range::RangeMOC,
         range::CellSelection,
         cellcellrange::CellOrCellRangeMOC,
-        HasMaxDepth
+        HasMaxDepth,
+        RangeMOCIterator,
     },
     elemset::range::MocRanges,
     qty::Hpx,
     deser::ascii::from_ascii_ivoa,
-    elem::cellcellrange::CellOrCellRange
+    elem::cellcellrange::CellOrCellRange,
+    idx::Idx,
 };
+
+use pgrx::iter::TableIterator;
+
 use crate::bmoc::*;
+
+// TESTS
+
+#[pg_extern]
+fn genere_multirange_txt() -> String {
+    "{[1,10), [20,30)}" .to_string()
+}
+
+// #[pg_extern]
+// fn genere_multirange() -> pgrx::datum::Datum {
+//     // Construction du multirange en tant que texte SQL
+//     let multirange_sql = "[1,10), [20,30)" ; // note : sans double parenthèses
+//     let final_expr = format!("{{{}}}", multirange_sql); // PostgreSQL array style string
+// 
+//     // Parse en tant que multirange en texte
+//     let value = format!("{{{}}}", multirange_sql); // multirange syntaxe texte
+//     Spi::get_one::<pgrx::datum::Datum>(&format!(
+//         "SELECT '{}'::int8multirange",
+//         value
+//     ))
+//     .expect("Failed to convert to int8multirange")
+// }
+
+// #[pg_extern]
+// fn genere_multirange() -> String {
+//     // Construction du multirange en tant que texte SQL
+//     let multirange_sql = "[1,10), [20,30)" ; // note : sans double parenthèses
+// 
+//     // Parse en tant que multirange en texte
+//     let value = format!("{{{}}}", multirange_sql); // multirange syntaxe texte
+//     format!(
+//         "SELECT '{}'::int8multirange",
+//         value
+//     )
+// }
+
+// ----------------------------- Postgres compatible types declarations & types conversions ------------------------------
 
 // Creation of a PSQL compatible type of RangeMOC
 #[derive(PostgresType, Debug, Serialize, Deserialize)]
@@ -53,17 +95,11 @@ impl From<PgRange<i64>> for StdRangeCrate {
     }
 }
 
-// Creation of a MOC
-#[pg_extern(immutable, parallel_safe)]
-pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> RangeMOCPSQL {
-    let mut std_ranges: Vec<StdRange<i64>> = Vec::new();
-
-    for r in ranges {
-        let new_range: StdRangeCrate = r.into();
-        std_ranges.push(new_range.0);
+// StdRangeCrate<i64> -> PgRange<i64>
+impl From<StdRangeCrate> for PgRange<i64> {
+    fn from(item: StdRangeCrate) -> PgRange<i64> {
+        PgRange::<i64>::new(item.0.start, item.0.end)
     }
-    
-    RangeMOCPSQL { depth_max, ranges:std_ranges }
 }
 
 // RangeMOCPSQL -> RangeMOC
@@ -99,30 +135,32 @@ impl From<RangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
     }
 }
 
-// UNNECESSARY : We use hpx_hash_range
-//
-// // Provides the part of the query that turns the ranges into betweens
-// // Form : element BETWEEN ... AND ... OR element BETWEEN ... AND ... 
-// #[pg_extern(immutable, parallel_safe)]
-// pub fn moc_to_between(element: String, moc: RangeMOCPSQL) -> String {
-//     let mut res = String::new();
-//     let len = moc.ranges.len();
-// 
-//     for (i, r) in moc.ranges.iter().enumerate() {
-//         res += &format!("{} BETWEEN {} AND {}", element, r.start, r.end);
-//         if i < len - 1 {
-//             res += " OR ";
-//         }
-//     }
-//     res
-// }
-// 
-// // Provides the complete query that returns the mocs that contain the element in at least one of their ranges
-// // Form : SELECT * FROM table WHERE element BETWEEN ... AND ... OR element BETWEEN ... AND ...;
-// #[pg_extern(immutable, parallel_safe)]
-// pub fn moc_contains_element_query(table: String, element: String, moc: RangeMOCPSQL) -> String {
-//     format!("SELECT * FROM {} WHERE {};", table, moc_to_between(element, moc))
-// }
+// --------------------------------------------------- MOC creation ------------------------------------------------------
+
+// Creation of a MOC
+#[pg_extern(immutable, parallel_safe)]
+pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> RangeMOCPSQL {
+    let mut std_ranges: Vec<StdRange<i64>> = Vec::new();
+
+    for r in ranges {
+        let new_range: StdRangeCrate = r.into();
+        std_ranges.push(new_range.0);
+    }
+    
+    RangeMOCPSQL { depth_max, ranges:std_ranges }
+}
+
+// Returns the vec of ranges of the moc
+#[pg_extern(immutable, parallel_safe)]
+pub fn to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
+    let mut res: Vec<PgRange<i64>> = Vec::new();
+    for r in moc.ranges {
+        res.push(r.into());
+    }
+    res
+}
+
+// ------------------------------------------------ deser::to_ascii_ivoa -------------------------------------------------
 
 // RangeMOCPSQL -> Ascii
 #[pg_extern(immutable, parallel_safe)]
@@ -134,6 +172,8 @@ pub fn moc_to_ascii(moc: RangeMOCPSQL) -> SpiResult<String> {
         Err(e) => error!("Failed to convert RangeMOC to ASCII: {}", e),
     }
 }
+
+// ----------------------------------------------- deser::from_ascii_ivoa ------------------------------------------------
 
 // Creation of a PSQL compatible type of CellOrCellRangeMOC
 #[derive(PostgresType, Debug, Serialize, Deserialize)]
@@ -186,17 +226,37 @@ pub fn moc_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
     }
 }
 
-// ------------------------------------------------ Contains -----------------------------------------------
+// ----------------------------------------------- moc::range::degrade -------------------------------------------------
+
+// Degrade the input MOC (= MOC complement)
+#[pg_extern(immutable, parallel_safe)]
+pub fn moc_degrade(moc: RangeMOCPSQL, new_depth: i32) -> RangeMOCPSQL {
+    let std_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
+    let std_res = std_moc.degraded(new_depth as u8);
+    std_res.into()
+}
+
+// ----------------------------------------------- moc::range::expanded -------------------------------------------------
+
+// Add the MOC external border of depth `self.depth_max`.
+#[pg_extern(immutable, parallel_safe)]
+pub fn moc_expanded(moc: RangeMOCPSQL) -> RangeMOCPSQL {
+    let std_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
+    let std_res = std_moc.expanded();
+    std_res.into()
+}
+
+// --------------------------------------------------- Contains ----------------------------------------------------------
 
 // Tests if the cell is in the MOC 
 // Remark : the coordinates are in radians
 #[pg_extern(immutable, parallel_safe)]
 pub fn moc_is_in(moc: RangeMOCPSQL, lon: f64, lat: f64) -> bool {
     let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
-    range_moc.is_in(lon, lat)
+    range_moc.is_in(lon.to_radians(), lat.to_radians())
 }
 
-//  ----------------------- Creation of a BMOC from different coverage types -------------------------------
+//  ------------------------------- Creation of a MOC from different coverage types --------------------------------------
 
 // Creation of a PSQL compatible type of CellSelection
 #[derive(PostgresEnum, Debug, Serialize, Deserialize)]
@@ -228,7 +288,7 @@ pub fn moc_from_cone(
     selection: CellSelectionPSQL
 ) -> RangeMOCPSQL
 {
-    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cone(lon, lat, radius, depth as u8, delta_depth as u8, selection.into());
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cone(lon.to_radians(), lat.to_radians(), radius.to_radians(), depth as u8, delta_depth as u8, selection.into());
     range_moc.into()
 }
 
@@ -245,7 +305,7 @@ pub fn moc_from_elliptical_cone(
     selection: CellSelectionPSQL
 ) -> RangeMOCPSQL
 {
-    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth as u8, delta_depth as u8, selection.into());
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_elliptical_cone(lon.to_radians(), lat.to_radians(), a.to_radians(), b.to_radians(), pa.to_radians(), depth as u8, delta_depth as u8, selection.into());
     range_moc.into()
 }
 
@@ -279,7 +339,7 @@ pub fn moc_from_box(
     selection: CellSelectionPSQL
 ) -> RangeMOCPSQL
 {
-    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_box(lon, lat, a, b, pa, depth as u8, selection.into());
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_box(lon.to_radians(), lat.to_radians(), a.to_radians(), b.to_radians(), pa.to_radians(), depth as u8, selection.into());
     range_moc.into()
 }
 
@@ -295,11 +355,13 @@ pub fn moc_from_ring(
     selection: CellSelectionPSQL
 ) -> RangeMOCPSQL
 {
-    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_ring(lon, lat, radius_int, radius_ext, depth as u8, delta_depth as u8, selection.into());
+    let range_moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_ring(lon.to_radians(), lat.to_radians(), radius_int.to_radians(), radius_ext.to_radians(), depth as u8, delta_depth as u8, selection.into());
     range_moc.into()
 }
 
-// ------------------------------------------------ Operations -----------------------------------------------
+// -------------------------------------------------------- Operations -----------------------------------------------------------
+
+// ----------------------------------------------------------- Not ---------------------------------------------------------------
 
 // Not
 #[pg_extern(immutable, parallel_safe)]
@@ -314,7 +376,7 @@ pub fn moc_complement(moc: RangeMOCPSQL) -> RangeMOCPSQL {
     moc_not(moc)
 }
 
-// Redefinition of !'s behavior
+// Redefinition of !'s behavior for Rust utilisations
 impl Not for RangeMOCPSQL {
   type Output = RangeMOCPSQL;
 
@@ -323,6 +385,8 @@ impl Not for RangeMOCPSQL {
     moc_not(moc)
   }
 }
+
+// ----------------------------------------------------------- And ---------------------------------------------------------------
 
 // And
 #[pg_extern(immutable, parallel_safe)]
@@ -355,6 +419,8 @@ fn my_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc & other
 }
 
+// ----------------------------------------------------------- Or ----------------------------------------------------------------
+
 // Or
 #[pg_extern(immutable, parallel_safe)]
 pub fn moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
@@ -386,6 +452,8 @@ fn my_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc | other
 }
 
+// ----------------------------------------------------------- Xor ---------------------------------------------------------------
+
 // Xor
 #[pg_extern(immutable, parallel_safe)]
 pub fn moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
@@ -410,6 +478,8 @@ impl BitXor for RangeMOCPSQL {
 fn my_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc ^ other
 }
+
+// ----------------------------------------------------------- Minus -------------------------------------------------------------
 
 // Minus
 #[pg_extern(immutable, parallel_safe)]
