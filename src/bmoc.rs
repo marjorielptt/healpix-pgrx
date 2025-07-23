@@ -2,8 +2,6 @@ use pgrx::prelude::*; // default
 
 use serde::{Serialize, Deserialize};
 
-use std::ops::Range as StdRange;
-
 // For the operations with the BMOCs
 use cdshealpix::nested::bmoc::BMOC;
 
@@ -84,19 +82,19 @@ impl From<BMOCpsql> for BMOC {
 // Cone 
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_cone_coverage_approx(depth: i32, cone_lon: f64, cone_lat:f64, cone_radius: f64) -> BMOCpsql {
-  cdshealpix::nested::cone_coverage_approx(depth as u8, cone_lon, cone_lat, cone_radius).into()
+  cdshealpix::nested::cone_coverage_approx(depth as u8, cone_lon.to_radians(), cone_lat.to_radians(), cone_radius.to_radians()).into()
 }
  
 // EllipticalCone
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_elliptical_cone_coverage(depth: i32, lon: f64, lat: f64, a: f64, b: f64, pa: f64) -> BMOCpsql {
-  cdshealpix::nested::elliptical_cone_coverage(depth as u8, lon, lat, a, b, pa).into()
+  cdshealpix::nested::elliptical_cone_coverage(depth as u8, lon.to_radians(), lat.to_radians(), a.to_radians(), b.to_radians(), pa.to_radians()).into()
 }
 
 // Zone
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_zone_coverage(depth: i32, lon_min: f64, lat_min: f64, lon_max: f64, lat_max: f64) -> BMOCpsql {
-  cdshealpix::nested::zone_coverage(depth as u8, lon_min, lat_min, lon_max, lat_max).into()
+  cdshealpix::nested::zone_coverage(depth as u8, lon_min.to_radians(), lat_min.to_radians(), lon_max.to_radians(), lat_max.to_radians()).into()
 }
 
 // Type created to adapt the Rust vertex tuple (f64, f64) to PSQL for polygon_coverage
@@ -123,13 +121,13 @@ pub fn hpx_polygon_coverage(depth: i32, vertices: Vec<VertexPSQL>, exact_solutio
 // Box
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_box_coverage(depth: i32, lon: f64, lat: f64, a: f64, b: f64, pa: f64) -> BMOCpsql {
-  cdshealpix::nested::box_coverage(depth as u8, lon, lat, a, b, pa).into()
+  cdshealpix::nested::box_coverage(depth as u8, lon.to_radians(), lat.to_radians(), a.to_radians(), b.to_radians(), pa.to_radians()).into()
 }
 
 // Ring
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_ring_coverage_approx(depth: i32, cone_lon: f64, cone_lat: f64, cone_radius_int: f64, cone_radius_ext: f64) -> BMOCpsql {
-  cdshealpix::nested::ring_coverage_approx(depth as u8, cone_lon, cone_lat, cone_radius_int, cone_radius_ext).into()
+  cdshealpix::nested::ring_coverage_approx(depth as u8, cone_lon.to_radians(), cone_lat.to_radians(), cone_radius_int.to_radians(), cone_radius_ext.to_radians()).into()
 }
 
 // ------------------------------------------------ Contains -----------------------------------------------
@@ -156,7 +154,7 @@ impl From<Status> for Statuspsql {
 // Contains
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_contains(bmoc: BMOCpsql, lon: f64, lat:f64) -> Statuspsql {
-    BMOC::from(bmoc).test_coo(lon, lat).into()
+    BMOC::from(bmoc).test_coo(lon.to_radians(), lat.to_radians()).into()
 }
 
 // ------------------------------------------------ Operations -----------------------------------------------
