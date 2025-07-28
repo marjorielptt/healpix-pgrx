@@ -2,6 +2,9 @@ use pgrx::prelude::*; // default
 
 use serde::{Serialize, Deserialize};
 
+// For the BMOC creations
+use cdshealpix::nested::bmoc::BMOCBuilderUnsafe;
+
 // For the operations with the BMOCs
 use cdshealpix::nested::bmoc::BMOC;
 
@@ -13,6 +16,38 @@ use std::ops::Not;
 use std::ops::BitAnd;
 use std::ops::BitOr;
 use std::ops::BitXor;
+
+use std::ops::Range as StdRange;
+use pgrx::datum::Range as PgRange;
+
+// Creation of a StdRange type that is in the current crate to satisfy the orphan rule 
+pub struct StdRangeCrate(pub std::ops::Range<u64>);
+
+// PgRange<i64> -> StdRangeCrate<u64>
+impl From<PgRange<i64>> for StdRangeCrate {
+    fn from(item: PgRange<i64>) -> StdRangeCrate {
+        let start: u64 = match item.lower() {
+            Some(&RangeBound::Exclusive(lower_bound)) => lower_bound as u64 + 1,
+            Some(&RangeBound::Inclusive(lower_bound)) => lower_bound as u64,
+            Some(RangeBound::Infinite) => panic!("Infinite RangeBound"),
+            None => panic!("No RangeBound"),
+        };
+        let end: u64 = match item.upper() {
+            Some(&RangeBound::Exclusive(upper_bound)) => upper_bound as u64,
+            Some(&RangeBound::Inclusive(upper_bound)) => upper_bound as u64 + 1,
+            Some(RangeBound::Infinite) => panic!("Infinite RangeBound"),
+            None => panic!("No RangeBound"),
+        };
+        StdRangeCrate( StdRange {start, end})
+    }
+}
+
+// StdRangeCrate<i64> -> PgRange<i64>
+impl From<StdRangeCrate> for PgRange<i64> {
+    fn from(item: StdRangeCrate) -> PgRange<i64> {
+        PgRange::<i64>::new(item.0.start as i64, item.0.end as i64)
+    }
+}
 
 // BMOC type that is PSQL compatible
 #[derive(PostgresType, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -157,6 +192,17 @@ pub fn hpx_contains(bmoc: BMOCpsql, lon: f64, lat:f64) -> Statuspsql {
     BMOC::from(bmoc).test_coo(lon.to_radians(), lat.to_radians()).into()
 }
 
+// Contains
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_contains_bool(bmoc: BMOCpsql, lon: f64, lat:f64) -> bool {
+    let status: Statuspsql = hpx_contains(bmoc, lon, lat);
+    match status {
+      Statuspsql::In => true,
+      Statuspsql::Out => false,
+      Statuspsql::Unknown => false,
+    }
+}
+
 // ------------------------------------------------ Operations -----------------------------------------------
 
 // Not
@@ -225,20 +271,6 @@ impl BitXor for BMOCpsql {
 
 // ------------------------------------------- Ranges representation -----------------------------------------
 
-// Returns a vector of ranges at the maximal depth (=29)
-#[pg_extern(immutable, parallel_safe)]
-pub fn hpx_to_ranges(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
-    let vec_range_u64: Vec<std::ops::Range<u64>> = BMOC::from(bmoc).to_ranges().into_vec();
-    let mut vec_range_i64: Vec<pgrx::datum::Range<i64>> = Vec::new();
-    for range_u64 in vec_range_u64 {
-      let lower_bound = range_u64.start;
-      let upper_bound = range_u64.end;
-      let range_i64 = pgrx::datum::Range::new(lower_bound as i64, upper_bound as i64);
-      vec_range_i64.push(range_i64);
-    }
-    vec_range_i64
-}
-
 // cdshealpix::nested::is_partial
 pub fn is_partial(raw_value: &i64) -> bool {
   (*raw_value & 1_i64) == 0_i64
@@ -246,7 +278,7 @@ pub fn is_partial(raw_value: &i64) -> bool {
 
 // Returns a vector of the ranges with flag=0 only
 #[pg_extern(immutable, parallel_safe)]
-pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
+pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
   let entries = bmoc.entries;
   let (flag0, _flag1): (Vec<i64>, Vec<i64>) = 
     entries.into_iter().partition(|cell| !is_partial(cell));
@@ -256,10 +288,23 @@ pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
 
 // Returns a vector of the ranges with flag=1 only
 #[pg_extern(immutable, parallel_safe)]
-pub fn hpx_flag_one(bmoc: BMOCpsql) -> Vec<pgrx::datum::Range<i64>> {
+pub fn hpx_flag_one(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
   let entries = bmoc.entries;
   let (_flag0, flag1): (Vec<i64>, Vec<i64>) = 
     entries.into_iter().partition(|cell| !is_partial(cell));
   let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag1 };
   hpx_to_ranges(bmoc_res)
+}
+
+// Returns a vector of ranges at the maximal depth (=29)
+#[pg_extern(immutable, parallel_safe)]
+pub fn hpx_to_ranges(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
+  let std_bmoc: BMOC = bmoc.into();
+  let vec_range_u64: Vec<StdRange<u64>> = std_bmoc.to_ranges().into_vec();
+  let mut vec_range_i64: Vec<PgRange<i64>> = Vec::new();
+  for range_u64 in vec_range_u64 {
+    let range_u64_crate = StdRangeCrate(range_u64);
+    vec_range_i64.push(range_u64_crate.into());
+  }
+  vec_range_i64
 }
