@@ -16,53 +16,14 @@ use moc::{
         range::CellSelection,
         cellcellrange::CellOrCellRangeMOC,
         HasMaxDepth,
-        RangeMOCIterator,
     },
     elemset::range::MocRanges,
     qty::Hpx,
     deser::ascii::from_ascii_ivoa,
     elem::cellcellrange::CellOrCellRange,
-    idx::Idx,
 };
 
-use pgrx::iter::TableIterator;
-
 use crate::bmoc::*;
-
-// TESTS
-
-#[pg_extern]
-fn genere_multirange_txt() -> String {
-    "{[1,10), [20,30)}" .to_string()
-}
-
-// #[pg_extern]
-// fn genere_multirange() -> pgrx::datum::Datum {
-//     // Construction du multirange en tant que texte SQL
-//     let multirange_sql = "[1,10), [20,30)" ; // note : sans double parenthèses
-//     let final_expr = format!("{{{}}}", multirange_sql); // PostgreSQL array style string
-// 
-//     // Parse en tant que multirange en texte
-//     let value = format!("{{{}}}", multirange_sql); // multirange syntaxe texte
-//     Spi::get_one::<pgrx::datum::Datum>(&format!(
-//         "SELECT '{}'::int8multirange",
-//         value
-//     ))
-//     .expect("Failed to convert to int8multirange")
-// }
-
-// #[pg_extern]
-// fn genere_multirange() -> String {
-//     // Construction du multirange en tant que texte SQL
-//     let multirange_sql = "[1,10), [20,30)" ; // note : sans double parenthèses
-// 
-//     // Parse en tant que multirange en texte
-//     let value = format!("{{{}}}", multirange_sql); // multirange syntaxe texte
-//     format!(
-//         "SELECT '{}'::int8multirange",
-//         value
-//     )
-// }
 
 // ----------------------------- Postgres compatible types declarations & types conversions ------------------------------
 
@@ -152,7 +113,7 @@ pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> Range
 
 // Returns the vec of ranges of the moc
 #[pg_extern(immutable, parallel_safe)]
-pub fn to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
+pub fn moc_to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
     let mut res: Vec<PgRange<i64>> = Vec::new();
     for r in moc.ranges {
         res.push(r.into());
@@ -249,7 +210,6 @@ pub fn moc_expanded(moc: RangeMOCPSQL) -> RangeMOCPSQL {
 // --------------------------------------------------- Contains ----------------------------------------------------------
 
 // Tests if the cell is in the MOC 
-// Remark : the coordinates are in radians
 #[pg_extern(immutable, parallel_safe)]
 pub fn moc_is_in(moc: RangeMOCPSQL, lon: f64, lat: f64) -> bool {
     let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
