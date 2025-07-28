@@ -25,18 +25,7 @@ SELECT moc_to_ascii(create_range_moc_psql(29, ARRAY[int8range(100,200),int8range
 SELECT create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]) & create_range_moc_psql(28, ARRAY[int8range(500,600)]);
 
 -- Creation of a BMOC
-SELECT create_bmoc_psql(
-    29,
-    ARRAY[
-      8202, 8203, 8206, 8207, 8218, 8224, 8225, 8226, 8227, 8228, 8229, 8230, 8231, 8232, 8233,
-      8234, 8236, 8237, 8239, 8240, 8241, 8242, 8243, 8246, 8248, 8249, 8250, 8251, 8252, 8254,
-      8320, 8333, 8335, 8336, 8337, 8338, 8339, 8340, 8342, 8344, 8345, 8346, 8347, 8348, 8355,
-      8356, 8357, 8358, 8359, 8360, 8361, 8362, 8363, 8364, 8365, 8366, 8367, 8368, 8369, 8370,
-      8376, 8704, 8705, 8706, 8707, 8708, 11280, 11281, 11283, 11284, 11285, 11286, 11287, 11292,
-      11293, 11328, 11329, 11330, 11331, 11332, 11333, 11334, 11335, 11336, 11337, 11340, 11341,
-      11344, 11345, 11346, 11347, 11348, 11349, 11350, 11351, 11352, 11353, 11520, 11521
-    ]
-);
+SELECT create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]);
 
 -- Function test : hpx_elliptical_cone
 SELECT hpx_elliptical_cone_coverage(3, 36.80105218, 56.78028536, 14.93, 4.93, 75.0);
@@ -52,3 +41,25 @@ SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ int8multiran
 
 -- Same query but with a function that returns the ranges of a moc
 SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_ranges(create_range_moc_psql(29, ARRAY[int8range(100,200),int8range(300,400)]));
+
+-- Create a MOC from a cone
+SELECT moc_from_cone(13.158329, -72.80028, 5.64323, 6, 5, 'All');
+
+-- Return the cells contained in the moc created from a cone
+SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_ranges_moc_psql(moc_from_cone(13.158329, -72.80028, 5.64323, 6, 5, 'All'));
+
+-- Return the cells contained in the moc created from a cone
+-- DOESN'T USE THE INDEX
+select * from hip_table where hpx_hash(29, raicrs, deicrs) <@ to_ranges_bmoc_psql(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]));
+
+-- Idea of the query that return the bmoc post-filtered
+-- SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]))))
+--   | (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])))
+--   & (SELECT * FROM hip_table WHERE hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
+
+-- Query that replaces is_in_cone
+SELECT * FROM hip_table WHERE (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+OR ((hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+AND (hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
+
+
