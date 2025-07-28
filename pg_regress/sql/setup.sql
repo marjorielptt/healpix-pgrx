@@ -151,21 +151,17 @@ CREATE INDEX hpx_hash_tyc2_idx ON tyc2 (hpx_hash(29, ra_icrs_, de_icrs_));
 -- FUNCTIONS
 
 -- Recuperation of a MOC from a row of moc_table
-CREATE FUNCTION moc_from_moc_table(idx integer) RETURNS rangemocpsql AS '
+CREATE FUNCTION moc_from_moc_table(idx integer) RETURNS rangemocpsql AS
+    '
     SELECT create_range_moc_psql(
         (SELECT depth_max FROM moc_table WHERE id = idx),
         (SELECT array_agg(r) FROM moc_table, LATERAL unnest(ranges) AS r WHERE id = idx)
-    );'
-LANGUAGE SQL;
-
--- int8range[] -> int8multirange
-CREATE FUNCTION to_int8multirange(element int8range[]) RETURNS int8multirange AS '
-    SELECT range_agg(r) FROM unnest(element) AS r;
+    );
     '
 LANGUAGE SQL;
 
 -- int8range[] -> int8multirange
-CREATE OR REPLACE FUNCTION ranges_to_multirange(r int8range[])
+CREATE OR REPLACE FUNCTION to_int8multirange(r int8range[])
 RETURNS int8multirange AS $$
 DECLARE
     result int8multirange;
@@ -180,16 +176,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
--- Equivalent of the crate::moc::to_ranges() function in Rust 
+-- Equivalent of the crate::moc::moc_to_ranges() function in Rust 
 -- but this function provites the int8range[] -> int8multirange conversion
 -- so it works directly in postgres
-CREATE OR REPLACE FUNCTION to_ranges_psql(moc rangemocpsql)
+CREATE OR REPLACE FUNCTION to_ranges_moc_psql(moc rangemocpsql)
 RETURNS int8multirange AS $$
 DECLARE
     r int8range[];
     result int8multirange;
 BEGIN
-    r := to_ranges(moc);
+    r := moc_to_ranges(moc);
     EXECUTE format(
         'SELECT ''{%s}''::int8multirange',
         array_to_string(r, ',')
@@ -199,3 +195,46 @@ BEGIN
     RETURN result;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+-- Equivalent of the crate::bmoc::hpx_to_ranges() function in Rust 
+-- but this function provites the int8range[] -> int8multirange conversion
+-- so it works directly in postgres
+CREATE OR REPLACE FUNCTION to_ranges_bmoc_psql(bmoc BMOCpsql)
+RETURNS int8multirange AS $$
+DECLARE 
+    r int8range[];
+    result int8multirange;
+BEGIN
+    r := hpx_to_ranges(bmoc);
+    EXECUTE format(
+        'SELECT ''{%s}''::int8multirange',
+        array_to_string(r, ',')
+    )
+    INTO result;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+-- Equivalent of is_in_cone()
+CREATE OR REPLACE FUNCTION is_in_cone_psql() RETURNS bool AS
+    '
+    SELECT *
+    FROM hip_table
+    WHERE (
+      hpx_hash_range(29, raicrs, deicrs) <@ 
+        to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323)))
+      OR hpx_hash_range(29, raicrs, deicrs) <@ 
+        to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323)))
+    )
+    AND hpx_contains_bool(
+          hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),
+          raicrs, deicrs
+        );
+    '
+LANGUAGE SQL;
+
+-- FONCTIONNE
+explain select * from hip_table where hpx_hash_range(29, raicrs, deicrs) <@ to_ranges_bmoc_psql(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]));
+
+explain select * from hip_table where hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])));
