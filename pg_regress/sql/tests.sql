@@ -48,18 +48,22 @@ SELECT moc_from_cone(13.158329, -72.80028, 5.64323, 6, 5, 'All');
 -- Return the cells contained in the moc created from a cone
 SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_ranges_moc_psql(moc_from_cone(13.158329, -72.80028, 5.64323, 6, 5, 'All'));
 
--- Return the cells contained in the moc created from a cone
--- DOESN'T USE THE INDEX
-select * from hip_table where hpx_hash(29, raicrs, deicrs) <@ to_ranges_bmoc_psql(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]));
+-- Return the cells contained in the bmoc created from a cone
+explain select * from hip_table where hpx_hash_range(29, raicrs, deicrs) <@ to_ranges_bmoc_psql(hpx_cone_coverage_approx(29, 13.158329, -72.80028, 5.64323));
 
--- Idea of the query that return the bmoc post-filtered
--- SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]))))
---   | (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])))
---   & (SELECT * FROM hip_table WHERE hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
+-- Returns the cells COMPLETELY contained in the cone (flag=1)
+SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])));
 
--- Query that replaces is_in_cone
-SELECT * FROM hip_table WHERE (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
-OR ((hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
-AND (hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
+-- Returns the cells PARTIALLY contained in the cone (flag=0)
+SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])));
 
-
+-- Only uses the index in the InitPlan1 but not everywhere
+SELECT * FROM hip_table h
+WHERE EXISTS (
+    SELECT 1 FROM hip_table h
+    WHERE
+        hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+    OR 
+        ((hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+        AND (hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),h.raicrs, h.deicrs))
+);
