@@ -217,24 +217,46 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
 -- Equivalent of is_in_cone()
-CREATE OR REPLACE FUNCTION is_in_cone_psql() RETURNS bool AS
-    '
-    SELECT *
-    FROM hip_table
-    WHERE (
-      hpx_hash_range(29, raicrs, deicrs) <@ 
-        to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323)))
-      OR hpx_hash_range(29, raicrs, deicrs) <@ 
-        to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323)))
+-- Doesn't use the index
+CREATE OR REPLACE FUNCTION is_in_cone_bool(
+    depth integer,
+    lon double precision,
+    lat double precision,
+    radius double precision
+) RETURNS boolean
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM hip_table h
+        WHERE
+            (hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(depth, lon, lat, radius))))
+        OR (
+            (hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(depth, lon, lat, radius))))
+            AND hpx_contains_bool(hpx_cone_coverage_approx(depth, lon, lat, radius), h.raicrs, h.deicrs)
+        )
     )
-    AND hpx_contains_bool(
-          hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),
-          raicrs, deicrs
-        );
-    '
-LANGUAGE SQL;
+$$ LANGUAGE sql immutable;
 
--- FONCTIONNE
-explain select * from hip_table where hpx_hash_range(29, raicrs, deicrs) <@ to_ranges_bmoc_psql(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]));
+-- Returns the set of bmocs that satisfy is_in_cone_bool()
+-- Uses the index
+CREATE OR REPLACE FUNCTION is_in_cone_psql(depth integer, lon double precision, lat double precision, radius double precision) RETURNS TABLE(hip bigint, vmag double precision, raicrs double precision, deicrs double precision) AS
+    $$
+    SELECT * FROM hip_table h
+    WHERE
+        (hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(depth, lon, lat, radius))))
+    OR
+        ((hpx_hash_range(29, h.raicrs, h.deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(depth, lon, lat, radius))))
+        AND
+        (hpx_contains_bool(hpx_cone_coverage_approx(depth, lon, lat, radius), h.raicrs, h.deicrs)));
+    $$
+LANGUAGE sql immutable;
 
-explain select * from hip_table where hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])));
+-- Query that replaces is_in_cone
+SELECT * FROM hip_table WHERE (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+OR ((hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323))))
+AND (hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
+
+-- Idea of the query that return the bmoc post-filtered
+-- SELECT * FROM hip_table WHERE hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_one(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225]))))
+--   | (hpx_hash_range(29, raicrs, deicrs) <@ to_int8multirange(hpx_flag_zero(create_bmoc_psql(29, ARRAY[8202, 8203, 8206, 8207, 8218, 8224, 8225])))
+--   & (SELECT * FROM hip_table WHERE hpx_contains_bool(hpx_cone_coverage_approx(6, 13.158329, -72.80028, 5.64323),raicrs, deicrs)));
