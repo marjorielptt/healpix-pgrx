@@ -15,7 +15,7 @@ mod moc;
 
 // HEALPix functions
 
-// -------------------------------------------------- hash --------------------------------------------------------------------------
+// ------------------------------------ hash --------------------------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64
@@ -35,16 +35,16 @@ pub fn hpx_hash_range(depth: i32, lon:f64, lat:f64) -> pgrx::datum::Range<i64> {
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8
-pub fn hpx_best_starting_depth(d_max_rad: f64) -> f64 {
-    cdshealpix::best_starting_depth(d_max_rad) as f64
+pub fn hpx_best_starting_depth(d_max_deg: f64) -> i32 {
+    cdshealpix::best_starting_depth(d_max_deg.to_radians()) as i32
 }
 
 // -------------------------------------------------- nside --------------------------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn hpx_nside(depth: u8) -> u32
-pub fn hpx_nside(depth: i8) -> f64 {
-  cdshealpix::nside(depth as u8) as f64
+pub fn hpx_nside(depth: i32) -> i32 {
+  cdshealpix::nside(depth as u8) as i32
 }
 
 // -------------------------------------------------- nested::center -----------------------------------------------------------------
