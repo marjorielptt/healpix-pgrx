@@ -19,7 +19,7 @@ use moc::{
     },
     elemset::range::MocRanges,
     qty::Hpx,
-    deser::ascii::from_ascii_ivoa,
+    deser::ascii::{from_ascii_ivoa, AsciiError},
     elem::cellcellrange::CellOrCellRange,
 };
 
@@ -35,7 +35,7 @@ pub struct RangeMOCPSQL {
 }
 
 // Creation of a StdRange type that is in the current crate to satisfy the orphan rule 
-pub struct StdRangeCrate(pub std::ops::Range<i64>);
+pub struct StdRangeCrate(pub StdRange<i64>);
 
 // PgRange<i64> -> StdRangeCrate<i64>
 impl From<PgRange<i64>> for StdRangeCrate {
@@ -162,18 +162,18 @@ pub struct CellRangePSQL {
 }
 
 // CellOrCellRangeMOC -> RangeMOCPSQL
-impl From<CellOrCellRangeMOC<u32, Hpx::<u32>>> for RangeMOCPSQL {
-    fn from(item: CellOrCellRangeMOC<u32, Hpx::<u32>>) -> Self {
+impl From<CellOrCellRangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
+    fn from(item: CellOrCellRangeMOC<u64, Hpx::<u64>>) -> Self {
         let depth_max = item.depth_max() as i32;
         let vec_moc = item.moc_elems().0.0.into_vec();
-        let mut vec_u32 = Vec::new();
+        let mut vec_u64: Vec<StdRange<u64>> = Vec::new();
         for elem in vec_moc {
             match elem {
-                CellOrCellRange::Cell(cell) => vec_u32.push(StdRange {start: cell.idx, end: cell.idx}),
-                CellOrCellRange::CellRange(cell_range) => vec_u32.push(cell_range.range),
+                CellOrCellRange::Cell(cell) => vec_u64.push(StdRange {start: cell.idx, end: cell.idx+1}),
+                CellOrCellRange::CellRange(cell_range) => vec_u64.push(cell_range.range),
             }
         }
-        let vec_i64 = unsafe {std::mem::transmute::<Vec<StdRange<u32>>, Vec<StdRange<i64>>>(vec_u32)};
+        let vec_i64 = unsafe {std::mem::transmute::<Vec<StdRange<u64>>, Vec<StdRange<i64>>>(vec_u64)};
         RangeMOCPSQL{depth_max, ranges: vec_i64}
     }
 }
@@ -181,10 +181,12 @@ impl From<CellOrCellRangeMOC<u32, Hpx::<u32>>> for RangeMOCPSQL {
 // Ascii -> RangeMOCPSQL
 #[pg_extern(immutable, parallel_safe)]
 pub fn moc_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
-    match from_ascii_ivoa(input) {
+    let std_moc: Result<CellOrCellRangeMOC<u64, Hpx::<u64>>, AsciiError> = from_ascii_ivoa(input);
+    let res: SpiResult<RangeMOCPSQL> = match std_moc {
         Ok(range_moc) => Ok(range_moc.into()),
         Err(e) => error!("Failed to convert RangeMOC to ASCII: {}", e),
-    }
+    };
+    res
 }
 
 // ----------------------------------------------- moc::range::degrade -------------------------------------------------
@@ -375,7 +377,7 @@ impl BitAnd for RangeMOCPSQL {
 // Redefinition of &'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(&)]
-fn my_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn my_moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc & other
 }
 
@@ -408,7 +410,7 @@ impl BitOr for RangeMOCPSQL {
 // Redefinition of |'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(|)]
-fn my_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn my_moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc | other
 }
 
@@ -435,7 +437,7 @@ impl BitXor for RangeMOCPSQL {
 // Redefinition of ^'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(^)]
-fn my_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn my_moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc ^ other
 }
 
@@ -462,6 +464,7 @@ impl Sub for RangeMOCPSQL {
 // Redefinition of -'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(-)]
-fn my_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn my_moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc - other
 }
+
