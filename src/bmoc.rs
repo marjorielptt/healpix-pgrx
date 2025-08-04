@@ -20,6 +20,8 @@ use std::ops::BitXor;
 use std::ops::Range as StdRange;
 use pgrx::datum::Range as PgRange;
 
+use skyregion::{regions::cone::Cone, SkyRegion};
+
 // Creation of a StdRange type that is in the current crate to satisfy the orphan rule 
 pub struct StdRangeCrate(pub std::ops::Range<u64>);
 
@@ -45,7 +47,7 @@ impl From<PgRange<i64>> for StdRangeCrate {
 // StdRangeCrate<i64> -> PgRange<i64>
 impl From<StdRangeCrate> for PgRange<i64> {
     fn from(item: StdRangeCrate) -> PgRange<i64> {
-        PgRange::<i64>::new(item.0.start as i64, item.0.end as i64)
+        PgRange::<i64>::new(item.0.start as i64, item.0.end as i64 - 1)
     }
 }
 
@@ -199,7 +201,7 @@ pub fn hpx_contains_bool(bmoc: BMOCpsql, lon: f64, lat:f64) -> bool {
     match status {
       Statuspsql::In => true,
       Statuspsql::Out => false,
-      Statuspsql::Unknown => false,
+      Statuspsql::Unknown => true,
     }
 }
 
@@ -237,13 +239,20 @@ impl BitAnd for BMOCpsql {
   }
 }
 
+// Redefinition of &'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(&)]
+fn my_bmoc_and(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
+    bmoc & other
+}
+
 // Or
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_or(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).or(&BMOC::from(other)).into()
 }
 
-// Redefinition of |'s behavior
+// Redefinition of |'s behavior for Rust utilisations
 impl BitOr for BMOCpsql {
   type Output = BMOCpsql;
 
@@ -253,13 +262,20 @@ impl BitOr for BMOCpsql {
   }
 }
 
+// Redefinition of |'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(|)]
+fn my_bmoc_or(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
+    bmoc | other
+}
+
 // Xor
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_xor(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
     BMOC::from(bmoc).xor(&BMOC::from(other)).into()
 }
 
-// Redefinition of ^'s behavior
+// Redefinition of ^'s behavior for Rust utilisations
 impl BitXor for BMOCpsql {
   type Output = BMOCpsql;
 
@@ -267,6 +283,13 @@ impl BitXor for BMOCpsql {
     let bmoc = self;
     hpx_xor(bmoc, other)
   }
+}
+
+// Redefinition of ^'s behavior for Postgres utilisations
+#[pg_operator]
+#[opname(^)]
+fn my_bmoc_xor(bmoc: BMOCpsql, other: BMOCpsql) -> BMOCpsql {
+    bmoc ^ other
 }
 
 // ------------------------------------------- Ranges representation -----------------------------------------
@@ -281,7 +304,7 @@ pub fn is_partial(raw_value: &i64) -> bool {
 pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
   let entries = bmoc.entries;
   let (flag0, _flag1): (Vec<i64>, Vec<i64>) = 
-    entries.into_iter().partition(|cell| !is_partial(cell));
+    entries.into_iter().partition(|cell| is_partial(cell));
   let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag0 };
   hpx_to_ranges(bmoc_res)
 }
@@ -291,20 +314,45 @@ pub fn hpx_flag_zero(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
 pub fn hpx_flag_one(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
   let entries = bmoc.entries;
   let (_flag0, flag1): (Vec<i64>, Vec<i64>) = 
-    entries.into_iter().partition(|cell| !is_partial(cell));
+    entries.into_iter().partition(|cell| is_partial(cell));
   let bmoc_res = BMOCpsql{ depth_max: bmoc.depth_max, entries: flag1 };
   hpx_to_ranges(bmoc_res)
 }
 
-// Returns a vector of ranges at the maximal depth (=29)
+// Returns a vector of ranges
+// Warning : the ranges are not at the MOC depth, not a the depth 29
 #[pg_extern(immutable, parallel_safe)]
 pub fn hpx_to_ranges(bmoc: BMOCpsql) -> Vec<PgRange<i64>> {
-  let std_bmoc: BMOC = bmoc.into();
-  let vec_range_u64: Vec<StdRange<u64>> = std_bmoc.to_ranges().into_vec();
-  let mut vec_range_i64: Vec<PgRange<i64>> = Vec::new();
-  for range_u64 in vec_range_u64 {
-    let range_u64_crate = StdRangeCrate(range_u64);
-    vec_range_i64.push(range_u64_crate.into());
-  }
-  vec_range_i64
+    let depth_max = bmoc.depth_max;
+    let std_bmoc: BMOC = bmoc.into();
+
+    let vec_range_u64: Vec<StdRange<u64>> = std_bmoc.to_ranges().into_vec();
+    let mut vec_range_i64: Vec<PgRange<i64>> = Vec::new();
+
+    let shift = (29 - depth_max) << 1;
+    for r in vec_range_u64 {
+        vec_range_i64.push(StdRangeCrate((r.start << shift)..(r.end << shift)).into());
+    }
+
+    vec_range_i64
+}
+
+// --------------------------------------------------------- Skyregion ---------------------------------------------------------------
+
+#[pg_extern(immutable, parallel_safe)]
+fn skyregion_cone_contains(
+    lon_deg: f64,
+    lat_deg: f64,
+    radius_deg: f64,
+    test_lon_deg: f64,
+    test_lat_deg: f64,
+) -> bool {
+    match Cone::from_deg(lon_deg, lat_deg, radius_deg) {
+        Ok(cone) => {
+            let test_lon = test_lon_deg.to_radians();
+            let test_lat = test_lat_deg.to_radians();
+            cone.contains(test_lon, test_lat)
+        }
+        Err(_) => false,
+    }
 }
