@@ -1,6 +1,0 @@
-comment = 'healpix_pgrx:  Created by pgrx'
-default_version = '0.0.1'
-module_pathname = 'healpix_pgrx'
-relocatable = false
-superuser = true
-trusted = false
