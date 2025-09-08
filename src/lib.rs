@@ -19,14 +19,14 @@ mod moc;
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn hash(depth: u8, lon: f64, lat: f64) -> u64
-pub fn hpx_hash(depth: i32, lon:f64, lat:f64) -> i64 {
+pub fn mgx_hash(depth: i32, lon:f64, lat:f64) -> i64 {
   cdshealpix::nested::hash(depth as u8, lon.to_radians(), lat.to_radians()) as i64
 }
 
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Test
-pub fn hpx_hash_range(depth: i32, lon:f64, lat:f64) -> pgrx::datum::Range<i64> {
+pub fn mgx_hash_range(depth: i32, lon:f64, lat:f64) -> pgrx::datum::Range<i64> {
   let hash_value: i64 = cdshealpix::nested::hash(depth as u8, lon.to_radians(), lat.to_radians()) as i64;
   pgrx::datum::Range::<i64>::new(hash_value, hash_value + 1 )
 }
@@ -35,15 +35,15 @@ pub fn hpx_hash_range(depth: i32, lon:f64, lat:f64) -> pgrx::datum::Range<i64> {
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 /// Original signature : pub fn best_starting_depth(d_max_rad: f64) -> u8
-pub fn hpx_best_starting_depth(d_max_deg: f64) -> i32 {
+pub fn mgx_best_starting_depth(d_max_deg: f64) -> i32 {
     cdshealpix::best_starting_depth(d_max_deg.to_radians()) as i32
 }
 
 // -------------------------------------------------- nside --------------------------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
-// Original signature : pub fn hpx_nside(depth: u8) -> u32
-pub fn hpx_nside(depth: i32) -> i32 {
+// Original signature : pub fn nside(depth: u8) -> u32
+pub fn mgx_nside(depth: i32) -> i32 {
   cdshealpix::nside(depth as u8) as i32
 }
 
@@ -65,7 +65,7 @@ impl From<(f64, f64)> for Coo {
 #[inline]
 // Original signature : pub fn center(depth: u8, hash: u64) -> (f64, f64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_center(depth: i32, hash: i64) -> Coo {
+pub fn mgx_center(depth: i32, hash: i64) -> Coo {
   cdshealpix::nested::center(depth as u8, hash as u64).into()
 }
 
@@ -73,7 +73,7 @@ pub fn hpx_center(depth: i32, hash: i64) -> Coo {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn parent(hash: u64, delta_depth: u8) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub const fn hpx_parent(hash: i64, delta_depth: i32) -> i64 {
+pub const fn mgx_parent(hash: i64, delta_depth: i32) -> i64 {
   cdshealpix::nested::parent(hash as u64, delta_depth as u8) as i64
 }
 
@@ -95,7 +95,7 @@ impl From<RangeInclusiveCurrentCrate> for Range<i64> {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn siblings(depth: u8, hash: u64) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_siblings(depth: i32, hash: i64) -> Range<i64> {
+pub fn mgx_siblings(depth: i32, hash: i64) -> Range<i64> {
   RangeInclusiveCurrentCrate(cdshealpix::nested::siblings(depth as u8, hash as u64)).into()
 }
 
@@ -117,7 +117,7 @@ impl From<RangeCurrentCrate> for pgrx::datum::Range<i64> {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn children(hash: u64, delta_depth: u8) -> RangeInclusive<u64>
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
+pub fn mgx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
   RangeCurrentCrate(cdshealpix::nested::children(hash as u64, delta_depth as u8)).into()
 }
 
@@ -126,7 +126,7 @@ pub fn hpx_children(hash: i64, delta_depth: i32) -> pgrx::datum::Range<i64> {
 #[inline]
 // Original signature : pub fn to_uniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_to_uniq(depth: i32, hash: i64) -> i64 {
+pub fn mgx_to_uniq(depth: i32, hash: i64) -> i64 {
   cdshealpix::nested::to_uniq(depth as u8, hash as u64) as i64
 }
 
@@ -134,7 +134,7 @@ pub fn hpx_to_uniq(depth: i32, hash: i64) -> i64 {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn to_zuniq(depth: u8, hash: u64) -> u64
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_to_zuniq(depth: i32, hash: i64) -> i64 {
+pub fn mgx_to_zuniq(depth: i32, hash: i64) -> i64 {
   cdshealpix::nested::to_zuniq(depth as u8, hash as u64) as i64
 }
 
@@ -155,7 +155,7 @@ impl From<(u8, u64)> for UniqTuple {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn from_uniq(uniq_hash: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
+pub fn mgx_from_uniq(uniq_hash: i64) -> UniqTuple {
   cdshealpix::nested::from_uniq(uniq_hash as u64).into()
 }
 
@@ -163,14 +163,14 @@ pub fn hpx_from_uniq(uniq_hash: i64) -> UniqTuple {
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub const fn from_zuniq(zuniq: u64) -> (u8, u64)
 // Remark : With (depth : i8) it didn't work because the result couldn't be displayed in the console so I switched its type to i32
-pub fn hpx_from_zuniq(zuniq: i64) -> UniqTuple {
+pub fn mgx_from_zuniq(zuniq: i64) -> UniqTuple {
   cdshealpix::nested::from_zuniq(zuniq as u64).into()
 }
 
 // -------------------------------------------------- nested::external_edge -------------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
-pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
+pub fn mgx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::external_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
   unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) }
 }
@@ -178,7 +178,7 @@ pub fn hpx_external_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
 // -------------------------------------------------- nested::internal_edge --------------------------------------------------------------
 #[pg_extern(immutable, parallel_safe)]
 // Original signature : pub fn external_edge(depth: u8, hash: u64, delta_depth: u8) -> Box<[u64]> 
-pub fn hpx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
+pub fn mgx_internal_edge(depth: i32, hash: i64, delta_depth: i32) -> Vec<i64> {
   let vec_u64: Vec<u64> = cdshealpix::nested::internal_edge(depth as u8, hash as u64, delta_depth as u8).into_vec();
   unsafe { std::mem::transmute::<Vec<u64>, Vec<i64>>(vec_u64) }
 }
@@ -202,7 +202,7 @@ impl From<cdshealpix::compass_point::MainWindMap<u64>> for MainWindMapPSQL {
 #[pg_extern(immutable, parallel_safe)]
 #[inline]
 // Original signature : pub fn neighbours(depth: u8, hash: u64, include_center: bool) -> MainWindMap<u64>
-pub fn hpx_neighbours(depth: i32, hash: i64, include_center: bool) -> MainWindMapPSQL {
+pub fn mgx_neighbours(depth: i32, hash: i64, include_center: bool) -> MainWindMapPSQL {
   cdshealpix::nested::neighbours(depth as u8, hash as u64, include_center).into()
 }
 

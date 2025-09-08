@@ -5,14 +5,14 @@
 #.ENVIRONMENT    Debian
 #.KEYWORDS		 
 #.VERSION  1.0   29-Jul-2025
-#.PURPOSE        Install the extension healpix_pgrx
+#.PURPOSE        Install the extension mogipix
 #----------------
 
 PACK=install
 SHELL=/bin/sh
 
 PG_VERSION = 17
-EXT_NAME = healpix_pgrx
+EXT_NAME = mogipix
 VERSION=0.0.1
 
 # PostgreSQL repositories
@@ -20,7 +20,7 @@ PG_LIB_DIR = /usr/lib/postgresql/$(PG_VERSION)/lib
 PG_SHARE_DIR = /usr/share/postgresql/$(PG_VERSION)/extension
 
 # Source files directory
-SOURCE_DIR = cds_healpix_pgrx
+SOURCE_DIR = cds_mogipix
 
 # Targets
 .PHONY: install clean show

@@ -100,7 +100,7 @@ impl From<RangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
 
 // Creation of a MOC
 #[pg_extern(immutable, parallel_safe)]
-pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> RangeMOCPSQL {
+pub fn mgx_create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> RangeMOCPSQL {
     let mut std_ranges: Vec<StdRange<i64>> = Vec::new();
 
     for r in ranges {
@@ -113,7 +113,7 @@ pub fn create_range_moc_psql(depth_max: i32, ranges: Vec<PgRange<i64>>) -> Range
 
 // Returns the vec of ranges of the moc
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
+pub fn mgx_moc_to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
     let mut res: Vec<PgRange<i64>> = Vec::new();
     for r in moc.ranges {
         res.push(r.into());
@@ -125,7 +125,7 @@ pub fn moc_to_ranges(moc: RangeMOCPSQL) -> Vec<PgRange<i64>> {
 
 // RangeMOCPSQL -> Ascii
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_to_ascii(moc: RangeMOCPSQL) -> SpiResult<String> {
+pub fn mgx_moc_to_ascii(moc: RangeMOCPSQL) -> SpiResult<String> {
     let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
 
     match range_moc.to_ascii() {
@@ -180,7 +180,7 @@ impl From<CellOrCellRangeMOC<u64, Hpx::<u64>>> for RangeMOCPSQL {
 
 // Ascii -> RangeMOCPSQL
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
+pub fn mgx_moc_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
     let std_moc: Result<CellOrCellRangeMOC<u64, Hpx::<u64>>, AsciiError> = from_ascii_ivoa(input);
     let res: SpiResult<RangeMOCPSQL> = match std_moc {
         Ok(range_moc) => Ok(range_moc.into()),
@@ -193,7 +193,7 @@ pub fn moc_from_ascii_ivoa(input: &str) -> SpiResult<RangeMOCPSQL> {
 
 // Degrade the input MOC (= MOC complement)
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_degrade(moc: RangeMOCPSQL, new_depth: i32) -> RangeMOCPSQL {
+pub fn mgx_moc_degrade(moc: RangeMOCPSQL, new_depth: i32) -> RangeMOCPSQL {
     let std_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let std_res = std_moc.degraded(new_depth as u8);
     std_res.into()
@@ -203,7 +203,7 @@ pub fn moc_degrade(moc: RangeMOCPSQL, new_depth: i32) -> RangeMOCPSQL {
 
 // Add the MOC external border of depth `self.depth_max`.
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_expanded(moc: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_expanded(moc: RangeMOCPSQL) -> RangeMOCPSQL {
     let std_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let std_res = std_moc.expanded();
     std_res.into()
@@ -213,7 +213,7 @@ pub fn moc_expanded(moc: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Tests if the cell is in the MOC 
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_is_in(moc: RangeMOCPSQL, lon: f64, lat: f64) -> bool {
+pub fn mgx_is_in_moc(moc: RangeMOCPSQL, lon: f64, lat: f64) -> bool {
     let range_moc: RangeMOC<u64, Hpx::<u64>> = moc.into();
     range_moc.is_in(lon.to_radians(), lat.to_radians())
 }
@@ -241,7 +241,7 @@ impl From<CellSelectionPSQL> for CellSelection {
 
 // Creation of a MOC from a Cone
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_cone(
+pub fn mgx_moc_from_cone(
     lon: f64,
     lat: f64,
     radius: f64,
@@ -256,7 +256,7 @@ pub fn moc_from_cone(
 
 // Creation of a MOC from an EllipticalCone
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_elliptical_cone(
+pub fn mgx_moc_from_elliptical_cone(
     lon: f64,
     lat: f64,
     a: f64,
@@ -273,7 +273,7 @@ pub fn moc_from_elliptical_cone(
 
 // Creation of a MOC from a Polygon
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_polygon(
+pub fn mgx_moc_from_polygon(
     vertices: Vec<VertexPSQL>,
     complement: bool,
     depth: i32,
@@ -291,7 +291,7 @@ pub fn moc_from_polygon(
 
 // Creation of a MOC from a Box
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_box(
+pub fn mgx_moc_from_box(
     lon: f64,
     lat: f64,
     a: f64,
@@ -307,7 +307,7 @@ pub fn moc_from_box(
 
 // Creation of a MOC from a Ring
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_from_ring(
+pub fn mgx_moc_from_ring(
     lon: f64,
     lat: f64,
     radius_int: f64,
@@ -327,15 +327,15 @@ pub fn moc_from_ring(
 
 // Not
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_not(moc: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_not(moc: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc_std: RangeMOC<u64, Hpx::<u64>> = moc.into();
     moc_std.not().into()
-}
+} 
 
 // Complement
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_complement(moc: RangeMOCPSQL) -> RangeMOCPSQL {
-    moc_not(moc)
+pub fn mgx_moc_complement(moc: RangeMOCPSQL) -> RangeMOCPSQL {
+    mgx_moc_not(moc)
 }
 
 // Redefinition of !'s behavior for Rust utilisations
@@ -344,7 +344,7 @@ impl Not for RangeMOCPSQL {
 
   fn not(self) -> RangeMOCPSQL {
     let moc = self;
-    moc_not(moc)
+    mgx_moc_not(moc)
   }
 }
 
@@ -352,7 +352,7 @@ impl Not for RangeMOCPSQL {
 
 // And
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc_std: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let other_std: RangeMOC<u64, Hpx::<u64>> = other.into();
     moc_std.and(&other_std).into()
@@ -360,8 +360,8 @@ pub fn moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Intersection
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_intersection(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
-    moc_and(moc, other)
+pub fn mgx_moc_intersection(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    mgx_moc_and(moc, other)
 }
 
 // Redefinition of &'s behavior for Rust utilisations
@@ -370,14 +370,14 @@ impl BitAnd for RangeMOCPSQL {
 
   fn bitand(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc = self;
-    moc_and(moc, other)
+    mgx_moc_and(moc, other)
   }
 }
 
 // Redefinition of &'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(&)]
-fn my_moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn mgx_pg_moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc & other
 }
 
@@ -385,7 +385,7 @@ fn my_moc_and(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Or
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc_std: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let other_std: RangeMOC<u64, Hpx::<u64>> = other.into();
     moc_std.or(&other_std).into()
@@ -393,8 +393,8 @@ pub fn moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Union
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_union(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
-    moc_or(moc, other)
+pub fn mgx_moc_union(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+    mgx_moc_or(moc, other)
 }
 
 // Redefinition of |'s behavior for Rust utilisations
@@ -403,14 +403,14 @@ impl BitOr for RangeMOCPSQL {
 
   fn bitor(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc = self;
-    moc_or(moc, other)
+    mgx_moc_or(moc, other)
   }
 }
 
 // Redefinition of |'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(|)]
-fn my_moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn mgx_pg_moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc | other
 }
 
@@ -418,7 +418,7 @@ fn my_moc_or(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Xor
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc_std: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let other_std: RangeMOC<u64, Hpx::<u64>> = other.into();
     moc_std.xor(&other_std).into()
@@ -430,14 +430,14 @@ impl BitXor for RangeMOCPSQL {
 
   fn bitxor(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc = self;
-    moc_xor(moc, other)
+    mgx_moc_xor(moc, other)
   }
 }
 
 // Redefinition of ^'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(^)]
-fn my_moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn mgx_pg_moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc ^ other
 }
 
@@ -445,7 +445,7 @@ fn my_moc_xor(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
 
 // Minus
 #[pg_extern(immutable, parallel_safe)]
-pub fn moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+pub fn mgx_moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc_std: RangeMOC<u64, Hpx::<u64>> = moc.into();
     let other_std: RangeMOC<u64, Hpx::<u64>> = other.into();
     moc_std.minus(&other_std).into()
@@ -457,14 +457,14 @@ impl Sub for RangeMOCPSQL {
 
   fn sub(self, other: RangeMOCPSQL) -> RangeMOCPSQL {
     let moc = self;
-    moc_minus(moc, other)
+    mgx_moc_minus(moc, other)
   }
 }
 
 // Redefinition of -'s behavior for Postgres utilisations
 #[pg_operator]
 #[opname(-)]
-fn my_moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
+fn mgx_pg_moc_minus(moc: RangeMOCPSQL, other: RangeMOCPSQL) -> RangeMOCPSQL {
     moc - other
 }
 
